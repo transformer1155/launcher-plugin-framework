@@ -1,0 +1,11 @@
+[package]
+name = "ui-core"
+description = "自研即时模式 UI 内核：布局、控件、事件、绘制指令（零第三方依赖）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# 刻意零依赖：UI 内核只用 std，保证任何平台都能编译、任何后端都能驱动。

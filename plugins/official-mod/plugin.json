@@ -1,0 +1,26 @@
+{
+  "id": "com.example.official-mod",
+  "name": "Mod 管理",
+  "version": "0.1.0",
+  "author": "official",
+  "description": "列出、搜索、安装、移除 Mod",
+  "trust": "trusted",
+  "review": "official",
+  "min_framework_version": "0.1.0",
+  "tools": ["list_installed_mods", "search_mods", "install_mod", "remove_mod"],
+  "tool_docs": {
+    "list_installed_mods": "列出某实例已安装的 Mod",
+    "search_mods": "在线搜索 Mod（Modrinth）",
+    "install_mod": "安装 Mod 到某实例（simulated）",
+    "remove_mod": "从某实例移除 Mod"
+  },
+  "network": {
+    "allow_hosts": ["api.modrinth.com"],
+    "reason": "Mod 搜索需要访问 Modrinth 的公开 API；不涉及用户账号与写操作"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "key_id": "official-plugin-2026",
+    "signature_hex": "PLACEHOLDER_TO_BE_REPLACED_BY_RELEASE_SIGNING"
+  }
+}

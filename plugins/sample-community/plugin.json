@@ -1,0 +1,16 @@
+{
+  "id": "com.example.sample-community",
+  "name": "社区示例插件",
+  "version": "0.1.0",
+  "author": "community",
+  "description": "示例社区插件：无签名，运行在受限沙箱；用于验证降级路径与崩溃重启",
+  "trust": "sandboxed",
+  "review": "unreviewed",
+  "min_framework_version": "0.1.0",
+  "tools": ["hello", "slow_task", "crash_me"],
+  "tool_docs": {
+    "hello": "打招呼",
+    "slow_task": "耗时任务，用于演示可中断超时",
+    "crash_me": "故意崩溃，用于演示沙箱重启"
+  }
+}

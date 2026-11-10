@@ -1,0 +1,22 @@
+{
+  "id": "com.example.official-instance",
+  "name": "实例管理",
+  "version": "0.1.0",
+  "author": "official",
+  "description": "创建、列出、切换、删除游戏实例",
+  "trust": "trusted",
+  "review": "official",
+  "min_framework_version": "0.1.0",
+  "tools": ["create_instance", "list_instances", "switch_instance", "delete_instance"],
+  "tool_docs": {
+    "create_instance": "创建一个新的游戏实例",
+    "list_instances": "列出全部游戏实例",
+    "switch_instance": "切换到指定实例并记录游玩时间",
+    "delete_instance": "删除指定实例（必须二次确认）"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "key_id": "official-plugin-2026",
+    "signature_hex": "PLACEHOLDER_TO_BE_REPLACED_BY_RELEASE_SIGNING"
+  }
+}

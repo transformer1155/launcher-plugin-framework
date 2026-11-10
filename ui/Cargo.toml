@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "ui-core",
+    "ui-backend-soft",
+    "ui-backend-win32",
+    "launcher-ui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+# 底层框架与插件（UI 通过它们读数据、调工具）
+launcher-plugin-framework = { path = ".." }
+launcher-plugin-common = { path = "../plugins/common" }
+official-instance = { path = "../plugins/official-instance" }
+official-mod = { path = "../plugins/official-mod" }
+official-launch = { path = "../plugins/official-launch" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+
+[profile.release]
+opt-level = 2
+lto = "thin"

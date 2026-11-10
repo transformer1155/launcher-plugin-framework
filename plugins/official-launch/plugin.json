@@ -1,0 +1,22 @@
+{
+  "id": "com.example.official-launch",
+  "name": "启动管理",
+  "version": "0.1.0",
+  "author": "official",
+  "description": "读取/设置启动参数、启动游戏、查看日志",
+  "trust": "trusted",
+  "review": "official",
+  "min_framework_version": "0.1.0",
+  "tools": ["get_launch_config", "set_launch_config", "launch_game", "get_last_log"],
+  "tool_docs": {
+    "get_launch_config": "读取实例的启动参数",
+    "set_launch_config": "设置实例的启动参数",
+    "launch_game": "启动游戏（返回 simulated pid）",
+    "get_last_log": "读取实例的最近日志"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "key_id": "official-plugin-2026",
+    "signature_hex": "PLACEHOLDER_TO_BE_REPLACED_BY_RELEASE_SIGNING"
+  }
+}

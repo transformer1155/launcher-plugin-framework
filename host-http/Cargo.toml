@@ -1,0 +1,35 @@
+[package]
+name = "host-http"
+description = "宿主侧 HTTP 实现：为插件 HttpPort 提供真实的出站 HTTPS（白名单强制在最外层）"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[dependencies]
+# 插件侧共享层：复用 HttpPort / HttpReply / AllowListedHttp 定义，
+# 保证宿主实现与插件期望的接口**完全一致**（不会各写一份）。
+launcher-plugin-common = { path = "../plugins/common" }
+
+# ---- TLS/HTTP 技术选型说明（重要）----
+#
+# 本 crate **不用** ureq / reqwest / native-tls，原因是它们的 TLS 后端在本机编不过：
+#   * ureq 的 `tls` feature 硬依赖 ring → 需要 C 编译器（本机无 MSVC/gcc）；
+#   * native-tls 走 schannel → 依赖 windows-sys → 需要 dlltool 生成 import lib，
+#     而本机 rustup 自带的 dlltool 有 CreateProcess 缺陷（实测失败）。
+#
+# 因此改用**纯 Rust** 的 TLS provider + 手写最小 HTTP/1.1 客户端：
+#   * `rustls`：TLS 协议实现（纯 Rust）
+#   * `rustls-rustcrypto`：纯 Rust 加密后端（替代 ring，无需 C）
+#   * `webpki-roots`：内置根证书（不依赖系统证书库）
+#
+# 实测：与 api.modrinth.com 完成 TLS 握手并取回 HTTP/1.1 200（3675 字节 JSON）。
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }
+rustls-rustcrypto = "0.0.2-alpha"
+webpki-roots = "0.26"
+
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }

@@ -1,0 +1,11 @@
+[package]
+name = "ui-backend-soft"
+description = "软件光栅后端：纯内存绘制，无需窗口（可测试、可导出图片）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ui-core = { path = "../ui-core" }

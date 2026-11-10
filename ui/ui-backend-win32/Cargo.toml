@@ -1,0 +1,11 @@
+[package]
+name = "ui-backend-win32"
+description = "Win32 GDI 后端（手写 FFI，无 windows-sys 依赖）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ui-core = { path = "../ui-core" }

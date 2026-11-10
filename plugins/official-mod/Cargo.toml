@@ -1,0 +1,22 @@
+[package]
+name = "official-mod"
+description = "官方插件：Mod 管理（可信）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+launcher-plugin-framework = { workspace = true }
+launcher-plugin-common = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+# 跨插件调用测试需要真实的 official-instance 作为调用目标。
+# 仅在 dev 依赖里 —— 运行时代码**不依赖**它（两个插件可独立加载）。
+official-instance = { path = "../official-instance" }
+# 真实网络集成测试用：官方宿主 HTTP 实现（含真实 TLS）。
+host-http = { path = "../../host-http" }

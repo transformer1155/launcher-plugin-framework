@@ -1,0 +1,32 @@
+[package]
+name = "launcher-plugin-framework"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Minecraft 启动器插件化底层框架（单进程 / 无子进程 / 无 IPC）"
+publish = false
+
+[dependencies]
+# 异步运行时。规格要求"所有接口异步化"，Rust 标准库没有异步执行器，
+# 因此必须引入一个运行时；这是运行时而非规格未定义的"依赖抽象"。
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+# 工具 input_schema 就是 JSON Schema，参数与结构化返回值都是 JSON。
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 插件包整体摘要（覆盖清单 + 全部代码文件）。
+sha2 = "0.10"
+# 数字签名校验。Ed25519：公钥内置、私钥官方持有。
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+# hex 编解码：签名与公钥的 wire 形式。
+hex = "0.4"
+
+[dev-dependencies]
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+[lib]
+name = "launcher_plugin_framework"
+path = "src/lib.rs"
+
+[[example]]
+name = "host_demo"
+path = "examples/host_demo.rs"

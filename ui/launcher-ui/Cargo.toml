@@ -1,0 +1,26 @@
+[package]
+name = "launcher-ui"
+description = "Minecraft 启动器界面（实例 / Mod / 启动三页）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ui-core = { path = "../ui-core" }
+ui-backend-soft = { path = "../ui-backend-soft" }
+launcher-plugin-common = { workspace = true }
+launcher-plugin-framework = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+ui-backend-win32 = { path = "../ui-backend-win32" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[[bin]]
+name = "launcher-ui"
+path = "src/main.rs"
