@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Download — Aether Launcher</title>
+<script>
+/* 防闪烁：与 index.html 共用同一组 Cookie 键，跨页面无缝记忆偏好 */
+(function () {
+  function getCookie(k) {
+    var row = document.cookie.split("; ").find(function (r) { return r.indexOf(k + "=") === 0; });
+    return row ? row.split("=")[1] : null;
+  }
+  var t = getCookie("aether_docs_theme"); if (t) document.documentElement.dataset.theme = t;
+  var l = getCookie("aether_docs_lang");  if (l) document.documentElement.dataset.lang  = l;
+})();
+</script>
+<style>
+/* ============================================================
+   Aether Launcher — Download 落地页（与 index.html 同一设计体系）
+   ============================================================ */
+:root[data-theme="dark"] {
+  --bg: #0d1117; --bg-soft: #10151c; --panel: #161b22; --panel-2: #1c2129;
+  --border: #30363d; --border-soft: #21262d;
+  --text: #e6edf3; --text-dim: #9198a1; --text-faint: #6e7681;
+  --accent: #58a6ff; --accent-dim: #1f3a5f; --green: #3fb950; --amber: #d29922; --red: #f85149;
+  --code-bg: #0a0e14; --shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+:root[data-theme="light"] {
+  --bg: #ffffff; --bg-soft: #f6f8fa; --panel: #f6f8fa; --panel-2: #eef1f4;
+  --border: #d0d7de; --border-soft: #e4e9ee;
+  --text: #1f2328; --text-dim: #59636e; --text-faint: #8c959f;
+  --accent: #0969da; --accent-dim: #dbeafe; --green: #1a7f37; --amber: #9a6700; --red: #cf222e;
+  --code-bg: #161b22; --shadow: 0 1px 3px rgba(31,35,40,.08);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+code, pre, .mono {
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+}
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 60px; z-index: 100;
+  display: flex; align-items: center; gap: 16px; padding: 0 20px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; letter-spacing: .3px; text-decoration: none; color: var(--text); }
+.brand .logo {
+  width: 26px; height: 26px; border: 1.5px solid var(--accent); border-radius: 6px;
+  display: grid; place-items: center; color: var(--accent); font-size: 13px;
+  font-family: "JetBrains Mono", Consolas, monospace;
+}
+.brand .tag { font-size: 11px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-weight: 500; }
+.topbar .spacer { flex: 1; }
+.toplink { color: var(--text-dim); text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 6px; }
+.toplink:hover { color: var(--text); background: var(--panel-2); }
+.ctrl {
+  height: 32px; min-width: 32px; padding: 0 10px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--panel); color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: inherit; transition: all .15s;
+}
+.ctrl:hover { color: var(--text); border-color: var(--accent); }
+.ctrl .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+/* ---------- 主内容 ---------- */
+main { max-width: 860px; margin: 0 auto; padding: 108px 24px 80px; }
+
+/* 下载 hero */
+.dl-hero { text-align: center; padding: 24px 0 36px; border-bottom: 1px solid var(--border); }
+.dl-hero h1 { font-size: 38px; letter-spacing: -1px; line-height: 1.2; }
+.dl-hero h1 .accent { color: var(--accent); }
+.dl-hero .sub { margin-top: 12px; font-size: 16px; color: var(--text-dim); }
+.dl-btn {
+  display: inline-flex; align-items: center; gap: 12px; margin-top: 30px;
+  padding: 15px 34px; border-radius: 10px; text-decoration: none;
+  background: var(--green); color: #fff; font-size: 17px; font-weight: 700;
+  border: 1px solid transparent; transition: all .15s; box-shadow: var(--shadow);
+}
+.dl-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.dl-btn svg { width: 20px; height: 20px; fill: currentColor; }
+.dl-btn .meta { font-size: 12px; font-weight: 500; opacity: .85; }
+.dl-alt { margin-top: 14px; font-size: 13px; color: var(--text-faint); }
+.dl-alt a { color: var(--accent); text-decoration: none; }
+.dl-alt a:hover { text-decoration: underline; }
+.badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 26px; }
+.badge {
+  font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px;
+  color: var(--text-dim); background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px;
+}
+.badge b { color: var(--green); font-weight: 600; }
+
+/* 区块 */
+section { padding: 36px 0 6px; border-bottom: 1px solid var(--border-soft); }
+section:last-of-type { border-bottom: none; }
+h2 { font-size: 22px; letter-spacing: -.3px; margin-bottom: 14px; scroll-margin-top: 80px; }
+h3 { font-size: 16.5px; margin: 22px 0 8px; }
+p { margin: 10px 0; }
+p.dim { color: var(--text-dim); }
+a.inl { color: var(--accent); text-decoration: none; }
+a.inl:hover { text-decoration: underline; }
+.inline-code {
+  font-family: "JetBrains Mono", Consolas, monospace; font-size: 12.5px;
+  background: var(--panel); border: 1px solid var(--border-soft); border-radius: 4px; padding: 1.5px 6px;
+  color: var(--accent);
+}
+
+/* 信息卡 */
+.info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 18px 0; }
+.info-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+.info-card .k { font-size: 11.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-faint); font-weight: 700; }
+.info-card .v { margin-top: 5px; font-size: 14.5px; font-weight: 600; }
+.info-card .v code { font-size: 12.5px; font-weight: 500; color: var(--accent); word-break: break-all; }
+.info-card .v .dim { font-weight: 500; }
+
+/* 步骤 */
+.step { display: flex; gap: 16px; margin: 20px 0; }
+.step .no {
+  flex: none; width: 34px; height: 34px; border-radius: 8px;
+  display: grid; place-items: center;
+  background: var(--accent-dim); color: var(--accent);
+  font-family: "JetBrains Mono", Consolas, monospace; font-weight: 700; font-size: 15px;
+  border: 1px solid var(--accent);
+}
+.step .body { flex: 1; }
+.step .body h3 { margin: 4px 0 6px; }
+.step .body p { color: var(--text-dim); font-size: 14px; }
+
+/* 提示块 */
+.note {
+  margin: 16px 0; padding: 12px 16px; border-radius: 8px; font-size: 13.5px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text-dim);
+  border-left: 3px solid var(--accent);
+}
+.note.warn { border-left-color: var(--amber); }
+.note b { color: var(--text); }
+.note .tag { font-weight: 700; margin-right: 6px; color: var(--accent); }
+.note.warn .tag { color: var(--amber); }
+
+/* 代码块 */
+.codeblock { margin: 16px 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow); }
+.codeblock .cb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; background: var(--panel); border-bottom: 1px solid var(--border-soft);
+}
+.codeblock .cb-lang { font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; color: var(--text-faint); letter-spacing: .5px; }
+.codeblock .cb-copy {
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  color: var(--text-dim); background: transparent; border: 1px solid var(--border);
+  border-radius: 5px; padding: 2px 10px; transition: all .15s;
+}
+.codeblock .cb-copy:hover { color: var(--accent); border-color: var(--accent); }
+.codeblock .cb-copy.ok { color: var(--green); border-color: var(--green); }
+.codeblock pre {
+  background: var(--code-bg); padding: 16px 18px; overflow-x: auto;
+  font-size: 13px; line-height: 1.65; color: #c9d1d9; scrollbar-width: thin;
+}
+.tok-c { color: #7d8590; font-style: italic; }
+.tok-s { color: #a5d6ff; }
+.tok-n { color: #f2cc60; }
+.tok-k { color: #ff7b72; }
+.tok-t { color: #ffa657; }
+.tok-f { color: #d2a8ff; }
+
+/* 表格 */
+.tbl { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+.tbl th, .tbl td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+.tbl th { background: var(--panel); font-weight: 650; white-space: nowrap; }
+.tbl tr:nth-child(even) td { background: color-mix(in srgb, var(--panel) 40%, transparent); }
+
+/* 语言可见性 */
+html[data-lang="zh"] .lang-en { display: none; }
+html[data-lang="en"] .lang-zh { display: none; }
+
+footer { padding: 28px 0 10px; color: var(--text-faint); font-size: 12.5px; text-align: center; }
+footer a { color: var(--accent); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<!-- ================= 顶栏 ================= -->
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <span class="logo">Æ</span>
+    <span>Aether Launcher</span>
+    <span class="tag">v0.1.0</span>
+  </a>
+  <div class="spacer"></div>
+  <a class="toplink" href="index.html">
+    <span class="lang-zh">← 返回文档</span><span class="lang-en">← Back to Docs</span>
+  </a>
+  <button class="ctrl" id="langBtn" title="切换语言 / Switch language">
+    <span class="pill-dot"></span><span id="langLabel">中 / EN</span>
+  </button>
+  <button class="ctrl" id="themeBtn" title="切换主题 / Toggle theme">
+    <span id="themeIcon">☀️</span>
+  </button>
+</header>
+
+<main>
+
+  <!-- ================= 下载 hero ================= -->
+  <div class="dl-hero">
+    <h1><span class="lang-zh">下载</span><span class="lang-en">Download</span> <span class="accent">Aether Launcher</span></h1>
+    <p class="sub">
+      <span class="lang-zh">单文件 exe，免安装、零依赖 —— 下载即用。</span>
+      <span class="lang-en">One single exe. No installer, no dependencies — download and run.</span>
+    </p>
+    <a class="dl-btn" href="dist/AetherLauncher.exe" download>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.47 10.78a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0-1.06-1.06L8.75 8.44V1.75a.75.75 0 0 0-1.5 0v6.69L4.78 5.97a.75.75 0 0 0-1.06 1.06l3.75 3.75ZM3 9.5a.75.75 0 0 0-1.5 0v3.25c0 .97.78 1.75 1.75 1.75h9.5a1.75 1.75 0 0 0 1.75-1.75V9.5a.75.75 0 0 0-1.5 0v3.25a.25.25 0 0 1-.25.25h-9.5a.25.25 0 0 1-.25-.25V9.5Z"/></svg>
+      <span class="lang-zh">下载 AetherLauncher.exe</span><span class="lang-en">Download AetherLauncher.exe</span>
+      <span class="meta">v0.1.0 · 3.07 MB</span>
+    </a>
+    <p class="dl-alt">
+      <span class="lang-zh">Windows 10 / 11 · x86_64 · 也可以</span><span class="lang-en">Windows 10 / 11 · x86_64 · or</span>
+      <a href="index.html#qs-build"><span class="lang-zh">从源码自行构建</span><span class="lang-en">build from source</span></a>
+    </p>
+    <div class="badges">
+      <span class="badge"><b>●</b> Pure Rust</span>
+      <span class="badge">exe <b>3.07 MB</b></span>
+      <span class="badge"><b>0</b> IPC</span>
+      <span class="badge">MCP <b>:3721</b></span>
+      <span class="badge">ed25519 <span class="lang-zh">签名</span><span class="lang-en">signed</span></span>
+    </div>
+  </div>
+
+  <!-- ================= 文件信息 ================= -->
+  <section id="info">
+    <h2><span class="lang-zh">文件信息</span><span class="lang-en">File Details</span></h2>
+    <p class="dim">
+      <span class="lang-zh">下载完成后建议先校验哈希（命令见下方），再双击运行。当前构建：</span>
+      <span class="lang-en">Verify the hash after download (command below) before running. Current build:</span>
+    </p>
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="k"><span class="lang-zh">版本</span><span class="lang-en">Version</span></div>
+        <div class="v">0.1.0</div>
+      </div>
+      <div class="info-card">
+        <div class="k"><span class="lang-zh">体积</span><span class="lang-en">Size</span></div>
+        <div class="v">3.07 MB <span class="dim">(3,221,504 <span class="lang-zh">字节</span><span class="lang-en">bytes</span>)</span></div>
+      </div>
+      <div class="info-card">
+        <div class="k"><span class="lang-zh">目标平台</span><span class="lang-en">Target</span></div>
+        <div class="v">Windows x86_64 <span class="dim">(pc-windows-gnu)</span></div>
+      </div>
+      <div class="info-card">
+        <div class="k"><span class="lang-zh">依赖</span><span class="lang-en">Dependencies</span></div>
+        <div class="v"><span class="lang-zh">无（标准库 + 内置 runtime）</span><span class="lang-en">None (static, self-contained)</span></div>
+      </div>
+    </div>
+    <h3>SHA-256</h3>
+    <div class="codeblock" data-lang="text" data-file="checksum">
+      <div class="cb-head"><span class="cb-lang">sha256</span><button class="cb-copy">Copy</button></div>
+<pre>6983e96235b481de6584d1e3615119eb274b7209588f2cfe45529726a82f8015  AetherLauncher.exe</pre>
+    </div>
+    <h3><span class="lang-zh">校验命令</span><span class="lang-en">Verify Command</span></h3>
+    <div class="codeblock" data-lang="bash" data-file="verify (PowerShell)">
+      <div class="cb-head"><span class="cb-lang">powershell</span><button class="cb-copy">Copy</button></div>
+<pre># Windows（自带，无需安装任何工具）
+Get-FileHash .\AetherLauncher.exe -Algorithm SHA256</pre>
+    </div>
+    <div class="codeblock" data-lang="bash" data-file="verify (Linux / macOS)">
+      <div class="cb-head"><span class="cb-lang">bash</span><button class="cb-copy">Copy</button></div>
+<pre>sha256sum AetherLauncher.exe
+# 或：shasum -a 256 AetherLauncher.exe</pre>
+    </div>
+    <div class="note">
+      <span class="tag">NOTE</span>
+      <span class="lang-zh">哈希对应<b>当前仓库构建</b>（dist/AetherLauncher.exe）。若你从发布页下载了新版本，以发布页公布的哈希为准。</span>
+      <span class="lang-en">The hash refers to the <b>current in-repo build</b> (dist/AetherLauncher.exe). For newer releases, use the hash published on the release page.</span>
+    </div>
+  </section>
+
+  <!-- ================= 三步上手 ================= -->
+  <section id="steps">
+    <h2><span class="lang-zh">三步上手</span><span class="lang-en">Up and Running in Three Steps</span></h2>
+
+    <div class="step">
+      <div class="no">1</div>
+      <div class="body">
+        <h3><span class="lang-zh">下载并运行</span><span class="lang-en">Download &amp; Run</span></h3>
+        <p>
+          <span class="lang-zh">点击上方绿色按钮下载 <code class="inline-code">AetherLauncher.exe</code>，放到任意目录双击运行。单文件、免安装、不写注册表；数据目录默认在 exe 旁的 <code class="inline-code">data/</code>（便携模式）。</span>
+          <span class="lang-en">Click the green button above to get <code class="inline-code">AetherLauncher.exe</code>, drop it anywhere and double-click. Single file, no installer, no registry; the data dir defaults to <code class="inline-code">data/</code> next to the exe (portable mode).</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="no">2</div>
+      <div class="body">
+        <h3><span class="lang-zh">确认 MCP Server 在线</span><span class="lang-en">Confirm the MCP Server Is Up</span></h3>
+        <p>
+          <span class="lang-zh">启动器启动时自动拉起 MCP Server（</span><span class="lang-en">The launcher auto-starts its MCP Server on</span>
+          <code class="inline-code">127.0.0.1:3721</code>
+          <span class="lang-zh">）。一条命令验证：</span><span class="lang-en">. One command to verify:</span>
+        </p>
+        <div class="codeblock" data-lang="bash" data-file="probe">
+          <div class="cb-head"><span class="cb-lang">bash</span><button class="cb-copy">Copy</button></div>
+<pre>curl http://127.0.0.1:3721/mcp -X POST -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="no">3</div>
+      <div class="body">
+        <h3><span class="lang-zh">接入 Claude / Cursor</span><span class="lang-en">Connect Claude / Cursor</span></h3>
+        <p>
+          <span class="lang-zh">把 Aether 的地址填进客户端的 MCP 配置即可让 AI 控制启动器。完整报文示例与插件开发指南见</span><span class="lang-en">Point the client's MCP config at Aether and the AI can drive the launcher. Full message examples and the plugin guide live in</span>
+          <a class="inl" href="index.html#mcp-connect"><span class="lang-zh">文档 §4 MCP 协议接入</span><span class="lang-en">Docs §4 MCP Protocol</span></a>。
+        </p>
+        <div class="codeblock" data-lang="json" data-file="claude_desktop_config.json">
+          <div class="cb-head"><span class="cb-lang">json</span><button class="cb-copy">Copy</button></div>
+<pre>{
+  "mcpServers": {
+    "aether-launcher": { "url": "http://127.0.0.1:3721/mcp" }
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 系统要求 ================= -->
+  <section id="requirements">
+    <h2><span class="lang-zh">系统要求</span><span class="lang-en">System Requirements</span></h2>
+    <table class="tbl">
+      <tr><th><span class="lang-zh">项目</span><span class="lang-en">Item</span></th><th><span class="lang-zh">要求</span><span class="lang-en">Requirement</span></th></tr>
+      <tr><td>OS</td><td>Windows 10 / 11（x86_64）</td></tr>
+      <tr><td><span class="lang-zh">运行时依赖</span><span class="lang-en">Runtime deps</span></td><td><span class="lang-zh">无 —— UI 是手写 Win32 FFI，无 WebView、无 .NET、无浏览器内核</span><span class="lang-en">None — hand-written Win32 FFI UI, no WebView, no .NET, no browser engine</span></td></tr>
+      <tr><td>JDK 21 <span class="lang-zh">（可选）</span><span class="lang-en">(optional)</span></td><td><span class="lang-zh">仅启动真实 Minecraft 时需要，可在启动器内自动下载</span><span class="lang-en">Only for launching real Minecraft; can be auto-downloaded in-app</span></td></tr>
+      <tr><td><span class="lang-zh">磁盘空间</span><span class="lang-en">Disk</span></td><td><span class="lang-zh">exe 3.07 MB；游戏本体与资源按需数 GB</span><span class="lang-en">3.07 MB for the exe; a few GB for the game &amp; assets on demand</span></td></tr>
+    </table>
+    <div class="note warn">
+      <span class="tag"><span class="lang-zh">提示</span><span class="lang-en">Heads-up</span></span>
+      <b>Windows SmartScreen</b>：
+      <span class="lang-zh">构建未做代码签名，首次运行可能弹出「Windows 已保护你的电脑」。点「更多信息」→「仍要运行」即可；请先核对上方 SHA-256。</span>
+      <span class="lang-en">The build is not code-signed, so first launch may trigger the "Windows protected your PC" dialog. Click "More info" → "Run anyway"; verify the SHA-256 above first.</span>
+    </div>
+  </section>
+
+  <!-- ================= 其他获取方式 ================= -->
+  <section id="sources">
+    <h2><span class="lang-zh">其他获取方式</span><span class="lang-en">Other Ways to Get It</span></h2>
+    <table class="tbl">
+      <tr><th><span class="lang-zh">方式</span><span class="lang-en">Channel</span></th><th><span class="lang-zh">说明</span><span class="lang-en">Notes</span></th></tr>
+      <tr>
+        <td><span class="lang-zh">从源码构建（推荐给开发者）</span><span class="lang-en">Build from source (recommended for devs)</span></td>
+        <td>Rust 1.85+ · <code class="inline-code">cargo build --release --manifest-path ui/launcher-ui/Cargo.toml</code> — <a class="inl" href="index.html#qs-build"><span class="lang-zh">完整步骤</span><span class="lang-en">full steps</span></a></td>
+      </tr>
+      <tr>
+        <td><span class="lang-zh">直接取用仓库产物</span><span class="lang-en">Grab the in-repo artifact</span></td>
+        <td><code class="inline-code">dist/AetherLauncher.exe</code>（<span class="lang-zh">即上方按钮的来源</span><span class="lang-en">same file as the button above</span>）</td>
+      </tr>
+    </table>
+  </section>
+
+  <footer>
+    <p>
+      <a href="index.html"><span class="lang-zh">技术文档</span><span class="lang-en">Documentation</span></a> ·
+      <a href="docs/security-boundary.md">security-boundary.md</a> ·
+      <a href="README.md">README.md</a><br>
+      Aether Launcher ·
+      <span class="lang-zh">单文件构建（纯 HTML/CSS/JS，无任何前端框架）。</span>
+      <span class="lang-en">single-file build (pure HTML/CSS/JS, no frontend framework).</span>
+    </p>
+  </footer>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Cookie：与 index.html 同键，跨页记忆 ---------- */
+  function setCookie(key, val) {
+    document.cookie = key + "=" + val + "; path=/; max-age=31536000; SameSite=Lax";
+  }
+  function getCookie(key) {
+    var row = document.cookie.split("; ").find(function (r) { return r.indexOf(key + "=") === 0; });
+    return row ? row.split("=")[1] : null;
+  }
+
+  /* ---------- 主题 / 语言 ---------- */
+  var themeBtn = document.getElementById("themeBtn");
+  var themeIcon = document.getElementById("themeIcon");
+  function applyTheme(t) {
+    document.documentElement.dataset.theme = t;
+    themeIcon.textContent = t === "dark" ? "☀️" : "🌙";
+    setCookie("aether_docs_theme", t);
+  }
+  themeBtn.addEventListener("click", function () {
+    applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
+  var langBtn = document.getElementById("langBtn");
+  var langLabel = document.getElementById("langLabel");
+  function applyLang(l) {
+    document.documentElement.dataset.lang = l;
+    document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
+    langLabel.textContent = l === "zh" ? "中 / EN" : "EN / 中";
+    setCookie("aether_docs_lang", l);
+  }
+  langBtn.addEventListener("click", function () {
+    applyLang(document.documentElement.dataset.lang === "zh" ? "en" : "zh");
+  });
+  window.addEventListener("load", function () {
+    var t = getCookie("aether_docs_theme");
+    if (t === "dark" || t === "light") applyTheme(t); else applyTheme("dark");
+    var l = getCookie("aether_docs_lang");
+    if (l === "zh" || l === "en") applyLang(l); else applyLang("zh");
+  });
+
+  /* ---------- 轻量语法着色（与 index.html 同款 tokenizer） ---------- */
+  var KEYWORDS = new Set(("fn let mut pub use struct enum impl match if else return async await move const static " +
+    "crate self Self where for in loop while as dyn mod trait type ref unsafe true false " +
+    "function var import export from new null undefined").split(" "));
+  var TOKEN = new RegExp(
+    [
+      "(\\/\\/[^\\n]*|#[^\\n]*)",
+      "(\"(?:[^\"\\\\\\n]|\\\\.)*\")",
+      "(\\b\\d[\\d_]*(?:\\.\\d+)?(?:_ms|_s|_kb|_us)?\\b)",
+      "([A-Za-z_$][\\w$]*)",
+      "([{}()\\[\\];,.:=<>+\\-*/!&|?@]+)"
+    ].join("|"),
+    "g"
+  );
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function highlight(code) {
+    var out = "", last = 0, m;
+    TOKEN.lastIndex = 0;
+    while ((m = TOKEN.exec(code)) !== null) {
+      out += esc(code.slice(last, m.index));
+      last = m.index + m[0].length;
+      if (m[1])      out += '<span class="tok-c">' + esc(m[1]) + "</span>";
+      else if (m[2]) out += '<span class="tok-s">' + esc(m[2]) + "</span>";
+      else if (m[3]) out += '<span class="tok-n">' + esc(m[3]) + "</span>";
+      else if (m[4]) {
+        var w = m[4], rest = code.slice(last);
+        if (KEYWORDS.has(w))       out += '<span class="tok-k">' + esc(w) + "</span>";
+        else if (/^[A-Z]/.test(w)) out += '<span class="tok-t">' + esc(w) + "</span>";
+        else if (/^\s*\(/.test(rest) || /^\s*:/.test(rest))
+                                   out += '<span class="tok-f">' + esc(w) + "</span>";
+        else                       out += esc(w);
+      }
+      else           out += esc(m[5]);
+    }
+    return out + esc(code.slice(last));
+  }
+  document.querySelectorAll(".codeblock pre").forEach(function (pre) {
+    pre.innerHTML = highlight(pre.textContent);
+  });
+
+  /* ---------- 复制按钮 ---------- */
+  document.querySelectorAll(".cb-copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var pre = btn.closest(".codeblock").querySelector("pre");
+      var text = pre.textContent;
+      function done(ok) {
+        btn.textContent = ok ? "Copied ✓" : "Failed";
+        btn.classList.toggle("ok", ok);
+        setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("ok"); }, 1400);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); },
+                                                 function () { done(false); });
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta); done(ok);
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

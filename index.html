@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aether Launcher — Docs</title>
+<script>
+/* 防闪烁：在解析 CSS 前同步应用 Cookie 里的偏好 */
+(function () {
+  function getCookie(k) {
+    var row = document.cookie.split("; ").find(function (r) { return r.indexOf(k + "=") === 0; });
+    return row ? row.split("=")[1] : null;
+  }
+  var t = getCookie("aether_docs_theme"); if (t) document.documentElement.dataset.theme = t;
+  var l = getCookie("aether_docs_lang");  if (l) document.documentElement.dataset.lang  = l;
+})();
+</script>
+<style>
+/* ============================================================
+   Aether Launcher Docs — 零依赖、低饱和度、双主题、双语
+   ============================================================ */
+:root[data-theme="dark"] {
+  --bg: #0d1117;          /* 页面底 */
+  --bg-soft: #10151c;     /* 侧栏 */
+  --panel: #161b22;       /* 面板 / 代码块 */
+  --panel-2: #1c2129;     /* 面板 hover */
+  --border: #30363d;
+  --border-soft: #21262d;
+  --text: #e6edf3;
+  --text-dim: #9198a1;
+  --text-faint: #6e7681;
+  --accent: #58a6ff;
+  --accent-dim: #1f3a5f;
+  --green: #3fb950;
+  --amber: #d29922;
+  --red: #f85149;
+  --code-bg: #0a0e14;
+  --shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-soft: #f6f8fa;
+  --panel: #f6f8fa;
+  --panel-2: #eef1f4;
+  --border: #d0d7de;
+  --border-soft: #e4e9ee;
+  --text: #1f2328;
+  --text-dim: #59636e;
+  --text-faint: #8c959f;
+  --accent: #0969da;
+  --accent-dim: #dbeafe;
+  --green: #1a7f37;
+  --amber: #9a6700;
+  --red: #cf222e;
+  --code-bg: #161b22;
+  --shadow: 0 1px 3px rgba(31,35,40,.08);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+code, pre, .mono {
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+}
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 60px; z-index: 100;
+  display: flex; align-items: center; gap: 16px; padding: 0 20px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; letter-spacing: .3px; }
+.brand .logo {
+  width: 26px; height: 26px; border: 1.5px solid var(--accent); border-radius: 6px;
+  display: grid; place-items: center; color: var(--accent); font-size: 13px; font-family: "JetBrains Mono", Consolas, monospace;
+}
+.brand .tag { font-size: 11px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-weight: 500; }
+.topbar .spacer { flex: 1; }
+.toplink { color: var(--text-dim); text-decoration: none; font-size: 13px; padding: 5px 10px; border-radius: 6px; }
+.toplink:hover { color: var(--text); background: var(--panel-2); }
+/* 下载入口（顶栏小按钮 + hero 大按钮）：绿色是"获取"语义色 */
+.dl-cta {
+  height: 32px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 14px; border-radius: 6px; text-decoration: none;
+  background: var(--green); color: #fff; font-size: 13px; font-weight: 600;
+  transition: all .15s; border: 1px solid transparent;
+}
+.dl-cta:hover { filter: brightness(1.12); color: #fff; }
+.ctrl {
+  height: 32px; min-width: 32px; padding: 0 10px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--panel); color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: inherit; transition: all .15s;
+}
+.ctrl:hover { color: var(--text); border-color: var(--accent); }
+.ctrl .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+#menuBtn { display: none; }
+
+/* ---------- 侧栏 ---------- */
+.sidebar {
+  position: fixed; top: 60px; left: 0; bottom: 0; width: 264px; z-index: 90;
+  overflow-y: auto; padding: 20px 14px 40px;
+  background: var(--bg-soft); border-right: 1px solid var(--border);
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.nav-group { margin-bottom: 22px; }
+.nav-group > .nav-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--text-faint); margin: 0 8px 8px;
+}
+.nav-group a {
+  display: block; padding: 5px 10px; margin: 1px 0; border-radius: 6px;
+  color: var(--text-dim); text-decoration: none; font-size: 13.5px;
+  border-left: 2px solid transparent; transition: all .12s;
+}
+.nav-group a:hover { color: var(--text); background: var(--panel-2); }
+.nav-group a.active { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); font-weight: 600; }
+.nav-sub { margin: 2px 0 2px 14px; }
+.nav-docs {
+  margin: 0 8px; padding: 12px; border: 1px dashed var(--border); border-radius: 8px;
+  font-size: 12px; color: var(--text-dim);
+}
+.nav-docs a { color: var(--accent); text-decoration: none; display: block; padding: 2px 0; }
+.nav-docs a:hover { text-decoration: underline; }
+
+/* ---------- 主内容 ---------- */
+main {
+  margin-left: 264px; margin-top: 60px; padding: 0 48px 80px;
+}
+.content { max-width: 880px; }
+
+/* Hero */
+.hero { padding: 56px 0 40px; border-bottom: 1px solid var(--border); }
+.hero h1 { font-size: 40px; letter-spacing: -1px; line-height: 1.2; }
+.hero h1 .accent { color: var(--accent); }
+.hero .slogan { margin-top: 14px; font-size: 17px; color: var(--text-dim); max-width: 640px; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.badge {
+  font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px;
+  color: var(--text-dim); background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px;
+}
+.badge b { color: var(--green); font-weight: 600; }
+.hero-actions { display: flex; gap: 12px; margin-top: 28px; }
+.btn {
+  display: inline-block; padding: 9px 20px; border-radius: 8px; font-size: 14px;
+  text-decoration: none; font-weight: 600; transition: all .15s; cursor: pointer;
+  border: 1px solid var(--border);
+}
+.btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.btn.dl { background: var(--green); color: #fff; border-color: transparent; }
+.btn.dl:hover { filter: brightness(1.12); }
+.btn.primary:hover { filter: brightness(1.1); }
+.btn.ghost { color: var(--text); background: var(--panel); }
+.btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 章节骨架 */
+section.doc { padding: 44px 0 8px; border-bottom: 1px solid var(--border-soft); }
+section.doc:last-of-type { border-bottom: none; }
+h2.doc-title {
+  font-size: 26px; letter-spacing: -.4px; margin-bottom: 6px;
+  scroll-margin-top: 84px;
+}
+h2 .sec-no { color: var(--text-faint); font-family: "JetBrains Mono", Consolas, monospace; font-size: 18px; margin-right: 10px; font-weight: 600; }
+h3 { font-size: 18.5px; margin: 34px 0 10px; scroll-margin-top: 84px; }
+h4 { font-size: 15.5px; margin: 24px 0 8px; color: var(--text); }
+p { margin: 10px 0; color: var(--text); }
+p.dim, li.dim { color: var(--text-dim); }
+a.inl { color: var(--accent); text-decoration: none; }
+a.inl:hover { text-decoration: underline; }
+ul.plain { margin: 8px 0 14px 22px; }
+ul.plain li { margin: 6px 0; }
+ol.plain { margin: 8px 0 14px 26px; }
+ol.plain li { margin: 9px 0; }
+.tbl td .ok   { color: var(--green); font-weight: 650; }
+.tbl td .no   { color: var(--red);   font-weight: 650; }
+.tbl td .part { color: var(--amber); font-weight: 650; }
+strong { font-weight: 650; }
+.inline-code {
+  font-family: "JetBrains Mono", Consolas, monospace; font-size: 12.5px;
+  background: var(--panel); border: 1px solid var(--border-soft); border-radius: 4px; padding: 1.5px 6px;
+  color: var(--accent);
+}
+
+/* 提示块 */
+.note {
+  margin: 16px 0; padding: 12px 16px; border-radius: 8px; font-size: 13.5px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text-dim);
+  border-left: 3px solid var(--accent);
+}
+.note.warn { border-left-color: var(--amber); }
+.note.danger { border-left-color: var(--red); }
+.note b { color: var(--text); }
+.note .tag { font-weight: 700; margin-right: 6px; color: var(--accent); }
+.note.warn .tag { color: var(--amber); }
+.note.danger .tag { color: var(--red); }
+
+/* 代码块 */
+.codeblock { margin: 16px 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow); }
+.codeblock .cb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; background: var(--panel); border-bottom: 1px solid var(--border-soft);
+}
+.codeblock .cb-lang { font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; color: var(--text-faint); letter-spacing: .5px; }
+.codeblock .cb-copy {
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  color: var(--text-dim); background: transparent; border: 1px solid var(--border);
+  border-radius: 5px; padding: 2px 10px; transition: all .15s;
+}
+.codeblock .cb-copy:hover { color: var(--accent); border-color: var(--accent); }
+.codeblock .cb-copy.ok { color: var(--green); border-color: var(--green); }
+.codeblock pre {
+  background: var(--code-bg); padding: 16px 18px; overflow-x: auto;
+  font-size: 13px; line-height: 1.65; color: #c9d1d9;
+  scrollbar-width: thin;
+}
+/* 语法高亮（tokenizer 输出的 class） */
+.tok-c { color: #7d8590; font-style: italic; }   /* 注释 */
+.tok-s { color: #a5d6ff; }                        /* 字符串 */
+.tok-n { color: #f2cc60; }                        /* 数字 */
+.tok-k { color: #ff7b72; }                        /* 关键字 */
+.tok-t { color: #ffa657; }                        /* 类型 / 大写开头 */
+.tok-f { color: #d2a8ff; }                        /* 函数调用 / JSON 键 */
+
+/* 表格 */
+.tbl { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+.tbl th, .tbl td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+.tbl th { background: var(--panel); font-weight: 650; white-space: nowrap; }
+.tbl td code { font-size: 12.5px; }
+.tbl tr:nth-child(even) td { background: color-mix(in srgb, var(--panel) 40%, transparent); }
+
+/* 架构图（ASCII 容器） */
+.diagram {
+  margin: 18px 0; padding: 18px; background: var(--code-bg); border: 1px solid var(--border);
+  border-radius: 8px; overflow-x: auto;
+}
+.diagram pre { font-size: 12.5px; line-height: 1.5; color: var(--text-dim); }
+.diagram .hi { color: var(--accent); font-weight: 600; }
+
+/* 页脚 */
+footer {
+  margin-top: 48px; padding: 24px 0; border-top: 1px solid var(--border);
+  color: var(--text-faint); font-size: 12.5px;
+}
+footer a { color: var(--accent); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+/* 语言可见性 */
+html[data-lang="zh"] .lang-en { display: none; }
+html[data-lang="en"] .lang-zh { display: none; }
+
+/* 响应式 */
+@media (max-width: 968px) {
+  .sidebar { transform: translateX(-100%); transition: transform .2s; }
+  .sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,.5); }
+  main { margin-left: 0; padding: 0 20px 60px; }
+  #menuBtn { display: inline-flex; }
+  .hero h1 { font-size: 30px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ================= 顶栏 ================= -->
+<header class="topbar">
+  <button class="ctrl" id="menuBtn" title="菜单">☰</button>
+  <div class="brand">
+    <span class="logo">Æ</span>
+    <span>Aether Launcher</span>
+    <span class="tag">v0.1.0</span>
+  </div>
+  <div class="spacer"></div>
+  <a class="dl-cta" href="download.html">
+    <span class="lang-zh">⬇ 下载</span><span class="lang-en">⬇ Download</span>
+  </a>
+  <a class="toplink" href="README.md">
+    <span class="lang-zh">仓库 README</span><span class="lang-en">Repo README</span>
+  </a>
+  <a class="toplink" href="docs/architecture.md">architecture.md</a>
+  <button class="ctrl" id="langBtn" title="切换语言 / Switch language">
+    <span class="pill-dot"></span><span id="langLabel">中 / EN</span>
+  </button>
+  <button class="ctrl" id="themeBtn" title="切换主题 / Toggle theme">
+    <span id="themeIcon">☀️</span>
+  </button>
+</header>
+
+<!-- ================= 侧栏 ================= -->
+<aside class="sidebar" id="sidebar">
+  <nav>
+    <div class="nav-group">
+      <p class="nav-title"><span class="lang-zh">开始</span><span class="lang-en">Getting Started</span></p>
+      <a href="#quickstart" data-spy="quickstart"><span class="lang-zh">快速开始</span><span class="lang-en">Quick Start</span></a>
+      <div class="nav-sub">
+        <a href="#qs-req" data-spy="qs-req"><span class="lang-zh">环境要求</span><span class="lang-en">Requirements</span></a>
+        <a href="#qs-build" data-spy="qs-build"><span class="lang-zh">编译与运行</span><span class="lang-en">Build &amp; Run</span></a>
+        <a href="#qs-mcp" data-spy="qs-mcp">MCP Server :3721</a>
+      </div>
+    </div>
+    <div class="nav-group">
+      <p class="nav-title"><span class="lang-zh">设计</span><span class="lang-en">Design</span></p>
+      <a href="#architecture" data-spy="architecture"><span class="lang-zh">架构设计</span><span class="lang-en">Architecture</span></a>
+      <div class="nav-sub">
+        <a href="#arch-single" data-spy="arch-single"><span class="lang-zh">单进程模型（0 IPC）</span><span class="lang-en">Single Process (0 IPC)</span></a>
+        <a href="#arch-layers" data-spy="arch-layers">L0–L4 <span class="lang-zh">分层</span><span class="lang-en">Layers</span></a>
+        <a href="#arch-iso" data-spy="arch-iso"><span class="lang-zh">异步隔离与超时</span><span class="lang-en">Async Isolation &amp; Timeout</span></a>
+      </div>
+    </div>
+    <div class="nav-group">
+      <p class="nav-title"><span class="lang-zh">开发</span><span class="lang-en">Development</span></p>
+      <a href="#plugin-dev" data-spy="plugin-dev"><span class="lang-zh">插件开发指南</span><span class="lang-en">Plugin Development</span></a>
+      <div class="nav-sub">
+        <a href="#pd-meta" data-spy="pd-meta">ToolMeta &amp; input_schema</a>
+        <a href="#pd-handler" data-spy="pd-handler"><span class="lang-zh">handler 与 ToolResult</span><span class="lang-en">Handler &amp; ToolResult</span></a>
+        <a href="#pd-full" data-spy="pd-full"><span class="lang-zh">完整示例</span><span class="lang-en">Full Example</span></a>
+      </div>
+    </div>
+    <div class="nav-group">
+      <p class="nav-title"><span class="lang-zh">集成</span><span class="lang-en">Integration</span></p>
+      <a href="#mcp" data-spy="mcp"><span class="lang-zh">MCP 协议接入</span><span class="lang-en">MCP Protocol</span></a>
+      <div class="nav-sub">
+        <a href="#mcp-connect" data-spy="mcp-connect">Claude / Cursor</a>
+        <a href="#mcp-rpc" data-spy="mcp-rpc">JSON-RPC <span class="lang-zh">报文</span><span class="lang-en">Messages</span></a>
+      </div>
+    </div>
+    <div class="nav-group">
+      <p class="nav-title"><span class="lang-zh">信任</span><span class="lang-en">Trust</span></p>
+      <a href="#security" data-spy="security"><span class="lang-zh">安全边界</span><span class="lang-en">Security Boundary</span></a>
+      <div class="nav-sub">
+        <a href="#sec-trust" data-spy="sec-trust">Trusted vs Sandboxed</a>
+        <a href="#sec-net" data-spy="sec-net"><span class="lang-zh">网络白名单</span><span class="lang-en">Network Allowlist</span></a>
+        <a href="#sec-risk" data-spy="sec-risk"><span class="lang-zh">逃逸风险声明</span><span class="lang-en">Escape Risk</span></a>
+      </div>
+    </div>
+    <div class="nav-group">
+      <p class="nav-title"><span class="lang-zh">附录（docs/ 原文）</span><span class="lang-en">Appendix (docs/)</span></p>
+      <a href="#appendix-a" data-spy="appendix-a"><span class="lang-zh">A · 架构说明</span><span class="lang-en">A · Architecture</span></a>
+      <div class="nav-sub">
+        <a href="#apx-a-layers" data-spy="apx-a-layers"><span class="lang-zh">分层与依赖方向</span><span class="lang-en">Layers &amp; Dependencies</span></a>
+        <a href="#apx-a-tradeoffs" data-spy="apx-a-tradeoffs"><span class="lang-zh">三条关键取舍</span><span class="lang-en">Key Trade-offs</span></a>
+      </div>
+      <a href="#appendix-b" data-spy="appendix-b"><span class="lang-zh">B · 安全边界声明</span><span class="lang-en">B · Security Boundary</span></a>
+      <div class="nav-sub">
+        <a href="#apx-b-trusted" data-spy="apx-b-trusted"><span class="lang-zh">可信 = 宿主同级权限</span><span class="lang-en">Trusted = Host Privilege</span></a>
+        <a href="#apx-b-sandbox" data-spy="apx-b-sandbox"><span class="lang-zh">沙箱的真实边界</span><span class="lang-en">Real Sandbox Limits</span></a>
+        <a href="#apx-b-build" data-spy="apx-b-build"><span class="lang-zh">构建硬要求</span><span class="lang-en">Build Requirements</span></a>
+      </div>
+      <a href="#appendix-c" data-spy="appendix-c"><span class="lang-zh">C · 遗留决策清单</span><span class="lang-en">C · Open Decisions</span></a>
+    </div>
+    <div class="nav-docs">
+      <b><span class="lang-zh">附录源文件（仓库内）</span><span class="lang-en">Appendix sources (in-repo)</span></b>
+      <a href="docs/architecture.md">docs/architecture.md</a>
+      <a href="docs/security-boundary.md">docs/security-boundary.md</a>
+      <a href="docs/open-questions.md">docs/open-questions.md</a>
+      <a href="README.md">README.md</a>
+    </div>
+  </nav>
+</aside>
+
+<!-- ================= 主内容 ================= -->
+<main>
+  <!-- Hero -->
+   
+  <div class="hero">
+    <h1>Aether <span class="accent">Launcher</span></h1>
+    <p class="slogan">
+      <span class="lang-zh">极低依赖、高性能、单进程无 IPC 的 Minecraft 启动器与插件框架。100% 纯 Rust，零 WebView，手写 Win32 FFI 原生 UI，原生支持 MCP 协议。</span>
+      <span class="lang-en">A Minecraft launcher &amp; plugin framework with minimal dependencies, single-process zero-IPC design. 100% pure Rust, zero WebView, hand-written Win32 FFI UI, MCP-native.</span>
+    </p>
+    <div class="badges">
+      <span class="badge"><b>●</b> Pure Rust</span>
+      <span class="badge">exe <b>2.78 MB</b></span>
+      <span class="badge"><b>0</b> IPC</span>
+      <span class="badge">MCP <b>Ready</b></span>
+      <span class="badge">Win32 FFI UI</span>
+      <span class="badge">tokio · serde · ed25519-dalek</span>
+    </div>
+    <div class="hero-actions">
+      <a class="btn dl" href="download.html"><span class="lang-zh">⬇ 免费下载 · 3.07 MB</span><span class="lang-en">⬇ Free Download · 3.07 MB</span></a>
+      <a class="btn ghost" href="#quickstart"><span class="lang-zh">快速开始 →</span><span class="lang-en">Quick Start →</span></a>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       §1 快速开始
+       ============================================================ -->
+  <section class="doc" id="quickstart">
+    <h2 class="doc-title" id="qs-top"><span class="sec-no">01</span><span class="lang-zh">快速开始</span><span class="lang-en">Quick Start</span></h2>
+    <p class="dim">
+      <span class="lang-zh">从克隆仓库到在 Claude Desktop 里控制启动器，全程约十分钟。</span>
+      <span class="lang-en">From clone to controlling the launcher inside Claude Desktop in about ten minutes.</span>
+    </p>
+
+    <h3 id="qs-req"><span class="lang-zh">环境要求</span><span class="lang-en">Requirements</span></h3>
+    <table class="tbl">
+      <tr><th><span class="lang-zh">组件</span><span class="lang-en">Component</span></th><th><span class="lang-zh">版本 / 说明</span><span class="lang-en">Version / Notes</span></th></tr>
+      <tr><td>Rust (stable)</td><td><b>1.85+</b>（workspace <code class="inline-code">rust-version = "1.85"</code>）</td></tr>
+      <tr><td>OS</td><td>Windows 10 / 11（UI 后端为手写 Win32 FFI；插件框架本体与平台无关）</td></tr>
+      <tr><td>cargo</td><td><span class="lang-zh">随 Rust 工具链附带，无需额外组件</span><span class="lang-en">Bundled with the toolchain, no extra components needed</span></td></tr>
+      <tr><td>JDK 21 <span class="lang-zh">（可选）</span><span class="lang-en">(optional)</span></td><td><span class="lang-zh">仅启动真实游戏进程时需要；可由启动器内下载</span><span class="lang-en">Only needed to spawn the real game; can be downloaded in-app</span></td></tr>
+    </table>
+
+    <h3 id="qs-build"><span class="lang-zh">编译与运行</span><span class="lang-en">Build &amp; Run</span></h3>
+    <p>
+      <span class="lang-zh">仓库是双工作区结构：根工作区（框架核心 + 插件）与</span>
+      <span class="lang-en">The repo is a dual-workspace tree: the root workspace (framework core + plugins) and</span>
+      <code class="inline-code">ui/</code>
+      <span class="lang-zh">（GUI 工作区）。启动器 exe 从</span>
+      <span class="lang-en">(the GUI workspace). The launcher exe is built from</span>
+      <code class="inline-code">ui/launcher-ui</code><span class="lang-zh">构建：</span><span class="lang-en">:</span>
+    </p>
+    <div class="codeblock" data-lang="bash" data-file="build.ps1 / bash">
+      <div class="cb-head"><span class="cb-lang">bash</span><button class="cb-copy">Copy</button></div>
+<pre># 1. release 编译启动器（bin 名：AetherLauncher）
+cargo build --release --manifest-path ui/launcher-ui/Cargo.toml
+
+# 2. 产物在 ui/target/release/AetherLauncher.exe，拷入 dist 即可
+cp ui/target/release/AetherLauncher.exe dist/AetherLauncher.exe
+
+# 3. 仅跑框架核心（根工作区，不含 GUI）
+cargo test --workspace</pre>
+    </div>
+    <div class="note">
+      <span class="tag">TIP</span>
+      <span class="lang-zh">为 Windows exe 嵌入图标与版本信息：GNU 工具链下无 <code>windres</code>，仓库用 <code>tools/stamp_exe.py</code>（纯标准库 ctypes）在编译后注入 —— 详见脚本头部注释。</span>
+      <span class="lang-en">To embed icon &amp; version info on Windows: there is no <code>windres</code> on the GNU toolchain, so the repo injects them post-build via <code>tools/stamp_exe.py</code> (pure-stdlib ctypes) — see the script header.</span>
+    </div>
+
+    <h3 id="qs-mcp"><span class="lang-zh">启动并验证 MCP Server</span><span class="lang-en">Start &amp; Verify the MCP Server</span></h3>
+    <p>
+      <span class="lang-zh">启动器进程启动时会拉起 MCP Server，监听</span>
+      <span class="lang-en">The launcher process brings up an MCP Server listening on</span>
+      <code class="inline-code">127.0.0.1:3721</code>
+      <span class="lang-zh">。用一条 <code>tools/list</code> 报文即可验证它是否在线：</span>
+      <span class="lang-en">. A single <code>tools/list</code> message verifies it is online:</span>
+    </p>
+    <div class="codeblock" data-lang="bash" data-file="verify-mcp.sh">
+      <div class="cb-head"><span class="cb-lang">bash</span><button class="cb-copy">Copy</button></div>
+<pre># MCP Server 在线探针：返回 tools 数组即说明注册表已就绪
+curl http://127.0.0.1:3721/mcp \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+
+# 预期：{"jsonrpc":"2.0","id":1,"result":{"tools":[ ... 已注册工具 ... ]}}</pre>
+    </div>
+    <div class="note">
+      <span class="tag">NOTE</span>
+      <span class="lang-zh">MCP 语义是<b>无状态</b>的：不需要 <code>initialize</code> 握手，每次请求独立成立。端到端语义由 <code>tests/mcp_semantics.rs</code> 覆盖。</span>
+      <span class="lang-en">MCP semantics here are <b>stateless</b>: no <code>initialize</code> handshake is required; each request stands alone. End-to-end semantics are covered by <code>tests/mcp_semantics.rs</code>.</span>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       §2 架构设计
+       ============================================================ -->
+  <section class="doc" id="architecture">
+    <h2 class="doc-title" id="arch-top"><span class="sec-no">02</span><span class="lang-zh">架构设计</span><span class="lang-en">Architecture</span></h2>
+
+    <h3 id="arch-single"><span class="lang-zh">单进程插件模型：0 IPC</span><span class="lang-en">Single-Process Plugin Model: 0 IPC</span></h3>
+    <p>
+      <span class="lang-zh">传统插件启动器每调用一次插件就要 spawn 子进程或走管道往返：序列化、进程切换、句柄管理全是成本。Aether 让</span>
+      <span class="lang-en">Classic launcher architectures spawn a child process or do pipe round-trips per plugin call — serialization, context switches and handle juggling everywhere. Aether instead</span>
+      <b><span class="lang-zh">插件与宿主共享同一 OS 进程</span><span class="lang-en">shares one OS process between host and plugins</span></b>
+      <span class="lang-zh">：插件工具就是一个 async 函数，注册进注册表后由调度器直接以</span>
+      <span class="lang-en">: a plugin tool is just an async function; once registered, the scheduler invokes it directly as a</span>
+      <code class="inline-code">tokio</code>
+      <span class="lang-zh">任务执行。参数用一次 JSON 跨界（MCP 语义要求），之后全程零拷贝引用。</span>
+      <span class="lang-en">tokio task. Parameters cross one JSON boundary (required by MCP semantics); everything after that is zero-copy references.</span>
+    </p>
+    <div class="diagram"><pre>
+┌─────────────────────────── one OS process ───────────────────────────┐
+│  <span class="hi">MCP Server (:3721)</span> ──► Registry ──► Scheduler ──► handler()       │
+│        ▲                                        │  timeout probe     │
+│        │                                        ▼                    │
+│   Claude / Cursor                        <span class="hi">tokio::spawn</span>(plugin task)  │
+│                                                │  catch_unwind       │
+│  GUI (Win32 FFI, immediate mode) ◄── state ────┘                     │
+└──────────────────────────────────────────────────────────────────────┘</pre></div>
+    <ul class="plain">
+      <li><b><span class="lang-zh">无进程边界</span><span class="lang-en">No process boundary</span></b> — <span class="lang-zh">调用即函数调用，返回即 Future 完成；没有管道粘包、没有协议协商。</span><span class="lang-en">A call is a function call; a return is a completed Future. No pipe framing, no protocol negotiation.</span></li>
+      <li><b><span class="lang-zh">成本转移到信任层</span><span class="lang-en">Cost shifted to the trust layer</span></b> — <span class="lang-zh">同进程意味着插件有能力做任何宿主能做的事，因此框架把安全性押在「签名信任 + 沙箱降级」上（见 <a class="inl" href="#security">§5</a>）。</span><span class="lang-en">Same-process means a plugin can do anything the host can, so safety is delegated to the signature-trust + sandbox-degradation model (see <a class="inl" href="#security">§5</a>).</span></li>
+      <li><b><span class="lang-zh">崩溃不等于失联</span><span class="lang-en">Crash ≠ lost contact</span></b> — <span class="lang-zh">沙箱插件的 panic 被 L1 捕获为结构化错误并按退避策略重启。</span><span class="lang-en">A sandboxed plugin's panic is captured by L1 as a structured error and restarted with backoff.</span></li>
+    </ul>
+
+    <h3 id="arch-layers">L0–L4 <span class="lang-zh">框架分层</span><span class="lang-en">Framework Layers</span></h3>
+    <p class="dim">
+      <span class="lang-zh">框架核心位于 <code>src/</code>，自下而上五层，依赖方向严格单向：</span>
+      <span class="lang-en">The framework core lives in <code>src/</code> in five bottom-up layers with a strictly one-way dependency direction:</span>
+      <code class="inline-code">L4 → L2 → L1 → L0</code>
+      <span class="lang-zh">；L3 只被 L2 / 入口使用，L1 不认识 L3。</span>
+      <span class="lang-en">; L3 is only consumed by L2 / the entry point, and L1 never knows about L3.</span>
+    </p>
+    <table class="tbl">
+      <tr><th>Layer</th><th>crates / modules</th><th><span class="lang-zh">职责</span><span class="lang-en">Responsibility</span></th></tr>
+      <tr><td><b>L0</b> <span class="lang-zh">基础</span><span class="lang-en">Foundation</span></td><td><code>error</code> <code>types</code> <code>json</code></td><td><span class="lang-zh">错误码、元数据、schema 校验。无异步、无锁。</span><span class="lang-en">Error codes, metadata, schema validation. No async, no locks.</span></td></tr>
+      <tr><td><b>L1</b> <span class="lang-zh">执行</span><span class="lang-en">Execution</span></td><td><code>catch_unwind</code> <code>scheduler</code></td><td><span class="lang-zh">虚拟进程执行单元、超时、取消、配额、状态机。</span><span class="lang-en">Virtual-process execution units, timeout, cancellation, quotas, state machine.</span></td></tr>
+      <tr><td><b>L2</b> <span class="lang-zh">编排</span><span class="lang-en">Orchestration</span></td><td><code>registry</code> <code>restart</code></td><td><span class="lang-zh">工具登记与 ACL、四步检查分流、退避重启与熔断。</span><span class="lang-en">Tool registration &amp; ACL, four-step check routing, backoff restart &amp; circuit breaking.</span></td></tr>
+      <tr><td><b>L3</b> <span class="lang-zh">信任</span><span class="lang-en">Trust</span></td><td><code>signature</code> <code>loader</code></td><td><span class="lang-zh">包整体验签、吊销列表、降级决策。</span><span class="lang-en">Whole-package signature verification, revocation list, degradation decisions.</span></td></tr>
+      <tr><td><b>L4</b> <span class="lang-zh">对外</span><span class="lang-en">Interface</span></td><td><code>mcp</code></td><td><span class="lang-zh">与 MCP 无状态语义对齐（无 initialize 握手）。</span><span class="lang-en">Stateless MCP semantics alignment (no initialize handshake).</span></td></tr>
+    </table>
+    <p class="dim">
+      <span class="lang-zh">完整目录结构与三条关键设计取舍，见</span>
+      <span class="lang-en">The full repo tree and the three key trade-offs are in</span>
+      <a class="inl" href="#appendix-a"><span class="lang-zh">附录 A（架构说明原文）</span><span class="lang-en">Appendix A</span></a>。
+    </p>
+
+    <h3 id="arch-iso"><span class="lang-zh">异步任务与超时计时器的隔离机制</span><span class="lang-en">Async Task &amp; Timeout Isolation</span></h3>
+    <p>
+      <span class="lang-zh">每个 <code>ToolDef</code> 声明自己的 <code>timeout_ms</code>。调度器把 handler 放进独立 tokio 任务执行，外层套超时预算、内层用 <code>catch_unwind</code> 兜住 panic —— 单个插件的失控只消耗它自己的预算，宿主主循环不受影响：</span>
+      <span class="lang-en">Every <code>ToolDef</code> declares its own <code>timeout_ms</code>. The scheduler runs each handler in an isolated tokio task, wrapped in a timeout budget, with <code>catch_unwind</code> underneath to contain panics — a runaway plugin only burns its own budget and never touches the host loop:</span>
+    </p>
+    <div class="codeblock" data-lang="rust" data-file="l1_isolation.rs">
+      <div class="cb-head"><span class="cb-lang">rust</span><button class="cb-copy">Copy</button></div>
+<pre>use std::panic::AssertUnwindSafe;
+use std::time::Duration;
+use tokio::time::timeout;
+
+/// 在隔离单元中执行一个工具调用：
+/// - panic 被 JoinError 捕获，不会带崩宿主；
+/// - 超过 budget 的调用被强制打断，JoinHandle 随后 abort 回收；
+/// - 宿主主循环与其它插件完全不受影响。
+pub async fn run_isolated&lt;F, Fut&gt;(factory: F, budget: Duration) -&gt; UnitOutcome
+where
+    F: FnOnce() -&gt; Fut + Send + 'static,
+    Fut: Future&lt;Output = ToolResult&gt; + Send,
+{
+    // AssertUnwindSafe：handler 是外部插件代码，框架不假设它 UnwindSafe。
+    let task = tokio::spawn(AssertUnwindSafe(async move { factory().await }));
+
+    match timeout(budget, task).await {
+        // 正常完成
+        Ok(Ok(result)) =&gt; UnitOutcome::Done(result),
+        // 子任务 panic：JoinError 携带 panic payload，转成结构化业务错误
+        Ok(Err(join_err)) if join_err.is_panic() =&gt; UnitOutcome::Panicked,
+        // 取消 / 其他 Join 异常
+        Ok(Err(_)) =&gt; UnitOutcome::Cancelled,
+        // 超时：预算耗尽。tokio 的 timeout 已放弃等待，
+        // 调度器随后对残留任务 abort()，杜绝僵尸任务堆积。
+        Err(_elapsed) =&gt; UnitOutcome::TimedOut,
+    }
+}</pre>
+    </div>
+    <div class="note">
+      <span class="tag">WHY</span>
+      <span class="lang-zh"><b>为什么 panic 必须在任务边界拦？</b>Rust 的 panic 是 per-thread unwind。<code>tokio::spawn</code> 的任务跑在调度器线程池里，panic 在任务内 unwind 到任务边界被 JoinError 接住——宿主的 Registry / GUI 线程完全无感。这就是「Trap/Panic 隔离」的全部原理：隔离点选在任务边界，而不是试图让 unsafe 代码「不 panic」。</span>
+      <span class="lang-en"><b>Why trap panics at the task boundary?</b> Rust panics unwind per-thread. A <code>tokio::spawn</code> task runs on the worker pool, so its panic unwinds to the task boundary and is captured as a JoinError — the host's Registry / GUI threads never notice. That is the whole idea of trap isolation: the isolation point is the task boundary, not wishful "non-panicking" unsafe code.</span>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       §3 插件开发指南
+       ============================================================ -->
+  <section class="doc" id="plugin-dev">
+    <h2 class="doc-title" id="pd-top"><span class="sec-no">03</span><span class="lang-zh">插件开发指南</span><span class="lang-en">Plugin Development Guide</span></h2>
+    <p class="dim">
+      <span class="lang-zh">一个插件 = 一个 Rust crate + 一份 <code>plugin.json</code>。每个导出函数是一个「工具」，通过 MCP 暴露给 AI 或 GUI。以下四步给出可直接编译的完整代码。</span>
+      <span class="lang-en">A plugin = one Rust crate + one <code>plugin.json</code>. Every exported function is a "tool" exposed to AI or the GUI via MCP. The four steps below are directly compilable.</span>
+    </p>
+
+    <h3 id="pd-meta">ToolMeta <span class="lang-zh">与</span><span class="lang-en">and</span> input_schema</h3>
+    <p>
+      <span class="lang-zh">框架内部用 <code>ToolMeta</code>（<code>src/types.rs</code>）描述一个已注册工具，你永远不用手写它 —— 它由声明式宏从 <code>ToolDef</code> 自动构建：</span>
+      <span class="lang-en">Internally the framework describes a registered tool with <code>ToolMeta</code> (<code>src/types.rs</code>). You never write one by hand — it is built declaratively from a <code>ToolDef</code>:</span>
+    </p>
+    <table class="tbl">
+      <tr><th><code>ToolMeta</code> <span class="lang-zh">字段</span><span class="lang-en">field</span></th><th><span class="lang-zh">含义</span><span class="lang-en">Meaning</span></th></tr>
+      <tr><td><code>name / description</code></td><td><span class="lang-zh">工具短名（注册表自动加 <code>插件id.</code> 前缀）与描述，直接进 MCP <code>tools/list</code></span><span class="lang-en">Short name (registry prefixes the plugin id) &amp; description, exposed verbatim via MCP <code>tools/list</code></span></td></tr>
+      <tr><td><code>input_schema</code></td><td>JSON Schema<span class="lang-zh">，校验与 MCP 暴露共用同一份</span><span class="lang-en"> shared by validation and MCP exposure</span></td></tr>
+      <tr><td><code>handler</code></td><td><span class="lang-zh">异步函数指针，同进程直接调用</span><span class="lang-en">async fn pointer, invoked in-process</span></td></tr>
+      <tr><td><code>trust_level</code></td><td>Trusted / Sandboxed<span class="lang-zh">（由 L3 验签决定，见 §5）</span><span class="lang-en">(decided by L3 verification, see §5)</span></td></tr>
+      <tr><td><code>allowed_callers</code></td><td>ACL<span class="lang-zh">：允许调用本工具的插件列表</span><span class="lang-en">: plugins allowed to call this tool</span></td></tr>
+      <tr><td><code>destructive</code></td><td><span class="lang-zh">破坏性标记：GUI 侧会二次确认</span><span class="lang-en">flag: GUI asks for confirmation before running</span></td></tr>
+      <tr><td><code>timeout_ms</code></td><td><span class="lang-zh">执行预算，交给 L1 隔离单元</span><span class="lang-en">execution budget handed to the L1 isolation unit</span></td></tr>
+    </table>
+    <p>
+      <span class="lang-zh">参数结构用 <code>tool_args!</code> 宏声明，框架在编译期生成 <code>input_schema</code>（JSON Schema）与反序列化代码。前缀 <code>r_</code> 为必填、<code>o_</code> 为可选：</span>
+      <span class="lang-en">Declare the argument struct with the <code>tool_args!</code> macro; the framework generates <code>input_schema</code> (JSON Schema) and deserialization at compile time. Prefix <code>r_</code> = required, <code>o_</code> = optional:</span>
+    </p>
+    <div class="codeblock" data-lang="rust" data-file="schema mapping">
+      <div class="cb-head"><span class="cb-lang">rust</span><button class="cb-copy">Copy</button></div>
+<pre>tool_args! {
+    /// 工具入参（宏自动产出 JSON Schema + Deserialize）
+    pub struct SysInfoArgs {
+        //   宏类型        JSON Schema 类型      是否必填
+        instance_id:  r_str(),   // "string"   required
+        version:      o_str(),   // "string"   optional
+        check_writable: o_bool() // "boolean"  optional
+                      = "是否检查数据目录可写性",
+    }
+}</pre>
+    </div>
+    <div class="codeblock" data-lang="json" data-file="generated input_schema">
+      <div class="cb-head"><span class="cb-lang">json</span><button class="cb-copy">Copy</button></div>
+<pre>{
+  "type": "object",
+  "properties": {
+    "instance_id":    { "type": "string",  "description": "实例 ID" },
+    "version":        { "type": "string" },
+    "check_writable": { "type": "boolean", "description": "是否检查数据目录可写性" }
+  },
+  "required": ["instance_id"]
+}</pre>
+    </div>
+
+    <h3 id="pd-handler"><span class="lang-zh">handler 与 ToolResult</span><span class="lang-en">Handler &amp; ToolResult</span></h3>
+    <p>
+      <span class="lang-zh">handler 是一个</span><span class="lang-en">A handler is an</span>
+      <code class="inline-code">async fn(ctx: PluginContext, args: YourArgs) -&gt; Result&lt;ToolResult, ToolError&gt;</code>
+      <span class="lang-zh">。<code>PluginContext</code> 注入运行时能力（插件私有数据目录、受白名单约束的 HTTP 端口、日志）；返回值 <code>ToolResult</code> 与 MCP 的 <code>tools/call</code> 响应体逐字段同构：</span>
+      <span class="lang-en">. <code>PluginContext</code> injects runtime capabilities (plugin-private data dir, allowlisted HTTP port, logging); the returned <code>ToolResult</code> is field-for-field isomorphic to the MCP <code>tools/call</code> response body:</span>
+    </p>
+    <div class="codeblock" data-lang="rust" data-file="ToolResult definition">
+      <div class="cb-head"><span class="cb-lang">rust</span><button class="cb-copy">Copy</button></div>
+<pre>/// MCP `tools/call` 的返回体：`{ content, structuredContent, isError }`
+pub struct ToolResult {
+    pub content: Vec&lt;ContentBlock&gt;,          // Text { text } | Json { json }
+    pub structured_content: Option&lt;Value&gt;,   // 结构化负载（AI 友好）
+    pub is_error: bool,                      // 业务失败也走 200，用 isError 表达
+}
+
+// 两个现成的构造出口：
+result::success(json!({ "os": "windows", "arch": "x86_64" }))          // is_error = false
+result::business(biz_codes::UPSTREAM_ERROR, "上游 403")                // is_error = true</pre>
+    </div>
+    <div class="note">
+      <span class="tag">NOTE</span>
+      <span class="lang-zh"><b>错误码是字符串枚举</b>（<code>biz_codes</code>，snake_case，如 <code>storage_error</code> / <code>upstream_error</code>）。业务失败不 panic、不返回 <code>Err</code> —— <code>Err</code> 保留给「工具根本没法执行」（参数非法、能力缺失），业务语义失败一律用 <code>business()</code> 把控制权交回 AI。</span>
+      <span class="lang-en"><b>Error codes are string enums</b> (<code>biz_codes</code>, snake_case, e.g. <code>storage_error</code> / <code>upstream_error</code>). Business failures neither panic nor return <code>Err</code> — <code>Err</code> is reserved for "the tool cannot run at all" (bad args, missing capability); semantic failures go through <code>business()</code> to hand control back to the AI.</span>
+    </div>
+
+    <h3 id="pd-full"><span class="lang-zh">完整示例：系统信息插件</span><span class="lang-en">Full Example: a System-Info Plugin</span></h3>
+    <p><span class="lang-zh">以下四份文件构成一个完整、可直接编译的插件 <code>com.example.sysinfo</code>。</span>
+       <span class="lang-en">The following four files make up a complete, directly compilable plugin <code>com.example.sysinfo</code>.</span></p>
+
+    <h4>① plugin.json</h4>
+    <div class="codeblock" data-lang="json" data-file="plugins/sysinfo/plugin.json">
+      <div class="cb-head"><span class="cb-lang">json</span><button class="cb-copy">Copy</button></div>
+<pre>{
+  "id": "com.example.sysinfo",
+  "name": "系统信息",
+  "version": "0.1.0",
+  "author": "you",
+  "description": "获取运行环境系统信息",
+  "trust": "sandboxed",
+  "review": "community",
+  "min_framework_version": "0.1.0",
+  "tools": ["get_sysinfo"],
+  "network": {
+    "allow_hosts": [],
+    "reason": "该插件不发起任何出站请求"
+  }
+}</pre>
+    </div>
+
+    <h4>② Cargo.toml</h4>
+    <div class="codeblock" data-lang="toml" data-file="plugins/sysinfo/Cargo.toml">
+      <div class="cb-head"><span class="cb-lang">toml</span><button class="cb-copy">Copy</button></div>
+<pre>[package]
+name = "sysinfo"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+launcher-plugin-common    = { path = "../../plugins/common" }
+launcher-plugin-framework = { path = "../.." }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "macros"] }</pre>
+    </div>
+
+    <h4>③ src/lib.rs <span class="lang-zh">（工具定义 + handler）</span><span class="lang-en">(tool definition + handler)</span></h4>
+    <div class="codeblock" data-lang="rust" data-file="plugins/sysinfo/src/lib.rs">
+      <div class="cb-head"><span class="cb-lang">rust</span><button class="cb-copy">Copy</button></div>
+<pre>//! com.example.sysinfo —— 最小可编译插件示例。
+//! 一个工具：get_sysinfo（返回 OS / 架构 / 逻辑核数 / 数据目录可写性）。
+
+use launcher_plugin_common::result::{self, biz_codes};
+use launcher_plugin_common::tool_args;
+use launcher_plugin_common::{PluginContext, ToolDef};
+use launcher_plugin_framework::error::ToolError;
+use launcher_plugin_framework::types::ToolResult;
+use serde_json::json;
+
+// ---- 1. 入参：tool_args! 在编译期生成 JSON Schema + Deserialize ----
+tool_args! {
+    /// get_sysinfo 的入参。
+    pub struct SysInfoArgs {
+        /// 可选：附带一次数据目录可写性探测。
+        check_writable: o_bool() = "是否检查数据目录可写性",
+    }
+}
+
+// ---- 2. handler：async fn，与宿主同进程执行 ----
+pub async fn handle(ctx: PluginContext, args: SysInfoArgs) -&gt; Result&lt;ToolResult, ToolError&gt; {
+    let os = std::env::consts::OS.to_owned();
+    let arch = std::env::consts::ARCH.to_owned();
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+
+    let mut writable = None;
+    if args.check_writable.unwrap_or(false) {
+        // PluginContext 提供按插件 id 隔离的私有数据目录。
+        let probe = ctx.data_dir().join(".write-probe");
+        writable = Some(match std::fs::write(&probe, b"ok") {
+            Ok(()) =&gt; {
+                let _ = std::fs::remove_file(&probe);
+                true
+            }
+            // 探测失败是「业务语义失败」：交回错误码，而不是 panic
+            Err(e) =&gt; {
+                return Ok(result::business(
+                    biz_codes::STORAGE_ERROR,
+                    format!("数据目录不可写：{e}"),
+                ))
+            }
+        });
+    }
+
+    // ---- 3. 返回：structuredContent 与 MCP 响应同构 ----
+    Ok(result::success(json!({
+        "os": os,
+        "arch": arch,
+        "logical_cores": cores,
+        "data_dir_writable": writable,
+    })))
+}
+
+// ---- 4. ToolDef：注册表据此构建 ToolMeta（input_schema 在此挂载） ----
+pub fn def() -&gt; ToolDef {
+    launcher_plugin_common::tool_def! {
+        name: "get_sysinfo",
+        description: "获取运行环境系统信息（OS / 架构 / 逻辑核数 / 数据目录可写性）",
+        destructive: false,
+        timeout_ms: 5_000,
+        args: SysInfoArgs,
+        handler: crate::sysinfo::handle
+    }
+}</pre>
+    </div>
+
+    <h4>④ <span class="lang-zh">注册与冒烟验证</span><span class="lang-en">Registration &amp; smoke test</span></h4>
+    <p class="dim">
+      <span class="lang-zh">在插件的 <code>build()</code> 里把 <code>def()</code> 登记进工具集（与 <code>plugins/official-*</code> 内置插件完全相同的模式，可直接参照 <code>official-instance/src/lib.rs</code>）；并确认 <code>plugin.json</code> 的 <code>tools</code> 数组已声明 <code>get_sysinfo</code>。加载后一条命令冒烟：</span>
+      <span class="lang-en">Register <code>def()</code> in the plugin's <code>build()</code> (exactly the same pattern as the built-in <code>plugins/official-*</code> crates — see <code>official-instance/src/lib.rs</code>); make sure <code>plugin.json</code>'s <code>tools</code> array declares <code>get_sysinfo</code>. After loading, smoke-test with one command:</span>
+    </p>
+    <div class="codeblock" data-lang="bash" data-file="smoke.sh">
+      <div class="cb-head"><span class="cb-lang">bash</span><button class="cb-copy">Copy</button></div>
+<pre>curl http://127.0.0.1:3721/mcp -X POST -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{
+        "name":"com.example.sysinfo.get_sysinfo",
+        "arguments":{"check_writable":true}}}'</pre>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       §4 MCP 协议接入
+       ============================================================ -->
+  <section class="doc" id="mcp">
+    <h2 class="doc-title" id="mcp-top"><span class="sec-no">04</span><span class="lang-zh">MCP 协议接入</span><span class="lang-en">MCP Protocol Integration</span></h2>
+    <p class="dim">
+      <span class="lang-zh">Aether 同时扮演两个角色：<b>MCP Server</b>（把插件工具暴露给外部 AI）与 <b>MCP Client</b>（工作坊页面可挂载第三方 MCP server）。</span>
+      <span class="lang-en">Aether plays both roles: an <b>MCP Server</b> (exposing plugin tools to external AI) and an <b>MCP Client</b> (the Workshop page can mount third-party MCP servers).</span>
+    </p>
+
+    <h3 id="mcp-connect"><span class="lang-zh">把 Claude / Cursor 连到 Aether</span><span class="lang-en">Connect Claude / Cursor to Aether</span></h3>
+    <p>
+      <span class="lang-zh">启动 Aether 后，MCP Server 已在</span>
+      <span class="lang-en">With Aether running, the MCP Server is already on</span>
+      <code class="inline-code">http://127.0.0.1:3721/mcp</code>
+      <span class="lang-zh">就绪。外部 AI 侧只需一份配置：</span>
+      <span class="lang-en">. The external AI side needs just one config file:</span>
+    </p>
+    <div class="codeblock" data-lang="json" data-file="claude_desktop_config.json">
+      <div class="cb-head"><span class="cb-lang">json</span><button class="cb-copy">Copy</button></div>
+<pre>{
+  "mcpServers": {
+    "aether-launcher": {
+      "url": "http://127.0.0.1:3721/mcp"
+    }
+  }
+}</pre>
+    </div>
+    <div class="codeblock" data-lang="json" data-file=".cursor/mcp.json (Cursor)">
+      <div class="cb-head"><span class="cb-lang">json</span><button class="cb-copy">Copy</button></div>
+<pre>{
+  "mcpServers": {
+    "aether-launcher": {
+      "url": "http://127.0.0.1:3721/mcp"
+    }
+  }
+}</pre>
+    </div>
+    <div class="note">
+      <span class="tag">TIP</span>
+      <span class="lang-zh">重启客户端后，让 AI 执行「列出 Aether 工具」即可看到全部插件工具（名称形如 <code>com.example.official-launch.install_minecraft</code>）。反向能力：Aether 工作坊页通过 <code>data/mcp-servers.json</code> 挂载外部 server：<code>{"servers":[{"name":"my-server","url":"http://127.0.0.1:8814/mcp"}]}</code>。</span>
+      <span class="lang-en">After restarting the client, ask the AI to "list Aether tools" and every plugin tool shows up (names like <code>com.example.official-launch.install_minecraft</code>). Reverse direction: the Workshop page mounts external servers via <code>data/mcp-servers.json</code>: <code>{"servers":[{"name":"my-server","url":"http://127.0.0.1:8814/mcp"}]}</code>.</span>
+    </div>
+
+    <h3 id="mcp-rpc">JSON-RPC <span class="lang-zh">报文交互</span><span class="lang-en">Message Flow</span></h3>
+    <p><b>tools/list</b> — <span class="lang-zh">拉取工具清单：</span><span class="lang-en">fetch the tool catalog:</span></p>
+    <div class="codeblock" data-lang="jsonrpc" data-file="tools/list">
+      <div class="cb-head"><span class="cb-lang">jsonrpc</span><button class="cb-copy">Copy</button></div>
+<pre>// → 请求
+{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}
+
+// ← 响应（截取）
+{"jsonrpc":"2.0","id":1,"result":{"tools":[
+  {
+    "name": "com.example.official-launch.install_minecraft",
+    "description": "从 Mojang 官方源下载真实 Minecraft 客户端并配置启动入口",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "instance_id": { "type": "string", "description": "实例 ID" },
+        "version":     { "type": "string", "description": "Minecraft 版本号" },
+        "loader":      { "type": "string", "description": "加载器（vanilla / fabric / forge）" }
+      },
+      "required": ["instance_id"]
+    }
+  }
+]}}</pre>
+    </div>
+    <p><b>tools/call</b> — <span class="lang-zh">调用工具并取回结构化结果：</span><span class="lang-en">invoke a tool and get the structured result back:</span></p>
+    <div class="codeblock" data-lang="jsonrpc" data-file="tools/call">
+      <div class="cb-head"><span class="cb-lang">jsonrpc</span><button class="cb-copy">Copy</button></div>
+<pre>// → 请求
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+  "name":"com.example.sysinfo.get_sysinfo",
+  "arguments":{"check_writable":true}
+}}
+
+// ← 响应（与框架 ToolResult 逐字段同构）
+{"jsonrpc":"2.0","id":2,"result":{
+  "content":[
+    {"type":"text","text":"windows / x86_64, 16 logical cores"}
+  ],
+  "structuredContent":{
+    "os":"windows","arch":"x86_64","logical_cores":16,
+    "data_dir_writable":true
+  },
+  "isError":false
+}}</pre>
+    </div>
+    <ul class="plain">
+      <li><b><span class="lang-zh">无状态</span><span class="lang-en">Stateless</span></b> — <span class="lang-zh">没有 <code>initialize</code> 握手与会话保持；任何请求独立成立，重启 AI 客户端零成本。</span><span class="lang-en">No <code>initialize</code> handshake, no session state; every request stands alone, restarting the AI client costs nothing.</span></li>
+      <li><b><span class="lang-zh">业务失败也是 200</span><span class="lang-en">Business failures are still 200</span></b> — <span class="lang-zh"><code>isError: true</code> + <code>biz_codes</code> 表达语义失败，AI 可据此自我纠正。</span><span class="lang-en"><code>isError: true</code> + <code>biz_codes</code> express semantic failure so the AI can self-correct.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================================================
+       §5 安全边界
+       ============================================================ -->
+  <section class="doc" id="security">
+    <h2 class="doc-title" id="sec-top"><span class="sec-no">05</span><span class="lang-zh">安全边界</span><span class="lang-en">Security Boundary</span></h2>
+    <p class="dim">
+      <span class="lang-zh">Aether 的安全模型是「<b>信任驱动</b>」而非「沙箱保证」：先验签决定信任级别，沙箱只负责故障隔离。以下三小节说清它保护什么、不保护什么。</span>
+      <span class="lang-en">Aether's model is <b>trust-driven</b>, not "sandbox-guaranteed": verification decides trust level first, and the sandbox only provides fault isolation. The three subsections below state exactly what is protected and what is not.</span>
+    </p>
+
+    <h3 id="sec-trust">Trusted <span class="lang-zh"> vs </span> Sandboxed</h3>
+    <table class="tbl">
+      <tr><th></th><th>Trusted</th><th>Sandboxed</th></tr>
+      <tr>
+        <th><span class="lang-zh">准入条件</span><span class="lang-en">Admission</span></th>
+        <td>ed25519 <span class="lang-zh">签名有效且未进吊销列表</span><span class="lang-en">signature valid &amp; not revoked</span></td>
+        <td><span class="lang-zh">无签名 / 签名无效 / 已吊销 / 显式要求</span><span class="lang-en">unsigned / invalid / revoked / explicitly requested</span></td>
+      </tr>
+      <tr>
+        <th><span class="lang-zh">执行位置</span><span class="lang-en">Execution site</span></th>
+        <td><span class="lang-zh">宿主主执行上下文，注册表直接调用，无调度器介入</span><span class="lang-en">host's main execution context; registry calls it directly, no scheduler</span></td>
+        <td><span class="lang-zh">虚拟进程沙箱（L1）：catch_unwind + 超时 + 配额</span><span class="lang-en">virtual-process sandbox (L1): catch_unwind + timeout + quotas</span></td>
+      </tr>
+      <tr>
+        <th><span class="lang-zh">故障半径</span><span class="lang-en">Blast radius</span></th>
+        <td><b style="color:var(--red)"><span class="lang-zh">崩溃即宿主故障</span><span class="lang-en">a crash takes down the host</span></b></td>
+        <td><span class="lang-zh">panic / 超时被捕获为结构化错误，按退避策略重启</span><span class="lang-en">panic / timeout captured as structured error, restarted with backoff</span></td>
+      </tr>
+      <tr>
+        <th><span class="lang-zh">典型对象</span><span class="lang-en">Typical holders</span></th>
+        <td>official-* <span class="lang-zh">内置插件（随发布签名）</span><span class="lang-en">built-ins (signed with the release)</span></td>
+        <td><span class="lang-zh">社区插件、验签降级的包</span><span class="lang-en">community plugins, degraded packages</span></td>
+      </tr>
+    </table>
+    <p class="dim">
+      <span class="lang-zh">签名体系基于 ed25519（<code>ed25519-dalek</code>）：<code>plugin.json</code> 携带 <code>key_id</code> + <code>signature_hex</code>，L3 对<b>整个包</b>验签（任何文件被篡改都会使签名失效，重命名文件同样算篡改），并支持签发方吊销列表；无签名包不会被拒绝，而是<b>降级</b>进沙箱运行并向用户明示。</span>
+      <span class="lang-en">Signatures are ed25519 (<code>ed25519-dalek</code>): <code>plugin.json</code> carries <code>key_id</code> + <code>signature_hex</code>, L3 verifies the <b>whole package</b> (any tampered file — even a renamed one — invalidates it) against an optional revocation list; unsigned packages are not rejected but <b>degraded</b> into the sandbox with a visible notice.</span>
+    </p>
+
+    <h3 id="sec-net"><span class="lang-zh">出站网络白名单（host-http）</span><span class="lang-en">Outbound Network Allowlist (host-http)</span></h3>
+    <p>
+      <span class="lang-zh">所有插件 HTTP 流量经过 <code>host-http</code> 的 <b>allowlist 传输层</b>：宿主按插件声明构建 <code>NetworkDecl</code>，任何未声明的 host 在传输层直接拒绝 —— 插件代码里不存在「绕过声明直连」的路径。</span>
+      <span class="lang-en">All plugin HTTP traffic goes through host-http's <b>allowlisted transport</b>: the host builds a <code>NetworkDecl</code> per plugin declaration, and any undeclared host is rejected at the transport layer — there is no in-plugin path to bypass the declaration.</span>
+    </p>
+    <div class="codeblock" data-lang="json" data-file="plugin.json → network">
+      <div class="cb-head"><span class="cb-lang">json</span><button class="cb-copy">Copy</button></div>
+<pre>{
+  "network": {
+    "allow_hosts": [
+      "api.adoptium.net",
+      "piston-meta.mojang.com",
+      "libraries.minecraft.net",
+      "meta.fabricmc.net"
+    ],
+    "reason": "install_minecraft 下载客户端、库与资源对象"
+  }
+}</pre>
+    </div>
+    <p class="dim">
+      <span class="lang-zh">子域名按后缀匹配（声明 <code>github.com</code> 即覆盖 <code>objects.githubusercontent.com</code> 不成立 —— 每个实际使用的 host 都要显式列出），声明必须附带 <code>reason</code> 供用户审阅。</span>
+      <span class="lang-en">Hosts are matched explicitly (declaring <code>github.com</code> does <i>not</i> cover <code>objects.githubusercontent.com</code> — every host actually used must be listed), and every declaration requires a <code>reason</code> for user review.</span>
+    </p>
+
+    <h3 id="sec-risk"><span class="lang-zh">native 代码逃逸风险（诚实声明）</span><span class="lang-en">Native Escape Risk (Honest Disclosure)</span></h3>
+    <div class="note danger">
+      <span class="tag">! </span>
+      <b><span class="lang-zh">沙箱插件 ≠ 安全沙箱。</span><span class="lang-en">Sandboxed ≠ a security sandbox.</span></b><br>
+      <span class="lang-zh">Aether 的沙箱目标是<b>可用性隔离</b>（防 panic、超时、配额失控拖垮宿主），<b>不是</b>完整性 / 机密性边界。插件与宿主同进程运行，native 代码可以通过 <code>unsafe</code> / FFI、直接文件系统访问、子进程派生、网络原始 socket 等方式绕过框架施加的一切约束。运行来路不明的插件 = 把本机权限交给它的作者。请只安装你信任来源的插件，并阅读 <a class="inl" href="docs/security-boundary.md">docs/security-boundary.md</a>。</span>
+      <span class="lang-en">Aether's sandbox targets <b>availability isolation</b> (panics, timeouts and quota runaways cannot take down the host), <b>not</b> an integrity / confidentiality boundary. Plugins share the host process; native code can escape every framework constraint via <code>unsafe</code> / FFI, direct filesystem access, subprocess spawning or raw sockets. Running a plugin from an unknown author equals handing it your machine. Only install plugins from sources you trust, and read <a class="inl" href="docs/security-boundary.md">docs/security-boundary.md</a>.</span>
+    </div>
+    <ul class="plain">
+      <li><b><span class="lang-zh">签名解决「作者是谁」</span><span class="lang-en">Signatures answer "who wrote it"</span></b> — <span class="lang-zh">；沙箱解决「它失控时宿主还能活着」</span><span class="lang-en">; the sandbox answers "will the host survive if it misbehaves"</span> — <span class="lang-zh">两者都不能回答「它是否恶意」。</span><span class="lang-en">neither answers "is it malicious".</span></li>
+      <li><b><span class="lang-zh">纵深防御</span><span class="lang-en">Defense in depth</span></b> — <span class="lang-zh">白名单网络 + 数据目录隔离 + 破坏性工具二次确认，抬高误操作成本，但不构成硬边界。</span><span class="lang-en">Allowlisted networking + per-plugin data dirs + destructive-tool confirmation raise the cost of accidents, but are not hard boundaries.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================================================
+       附录 A：docs/architecture.md 内嵌
+       ============================================================ -->
+  <section class="doc" id="appendix-a">
+    <h2 class="doc-title" id="apx-a-top"><span class="sec-no">A</span><span class="lang-zh">附录 · 架构说明</span><span class="lang-en">Appendix · Architecture Notes</span></h2>
+    <p class="dim">
+      <span class="lang-zh">本节是 <a class="inl" href="docs/architecture.md">docs/architecture.md</a> 的完整内嵌版本（附录正文保持文档原文）。</span>
+      <span class="lang-en">Full inline copy of <a class="inl" href="docs/architecture.md">docs/architecture.md</a>.</span>
+    </p>
+
+    <h3 id="apx-a-tree"><span class="lang-zh">目录结构与模块划分</span><span class="lang-en">Repo Tree &amp; Module Layout</span></h3>
+    <div class="diagram"><pre>launcher-plugin-framework/
+├── Cargo.toml
+├── README.md
+├── docs/
+│   ├── architecture.md           架构说明（进程模型 / 信任分级 / 调用链）
+│   ├── security-boundary.md      安全边界声明（可执行的、写进代码注释的同一套话）
+│   └── open-questions.md         需要你确认的遗留问题
+├── src/
+│   ├── lib.rs                    crate 根：模块声明、顶层 re-export、安全边界声明
+│   ├── error.rs                  错误码表 ToolError + MCP 同构映射
+│   ├── types.rs                  ToolMeta / TrustLevel / ToolResult / TaskId / UnitId
+│   ├── json.rs                   极简 JSONSchema 校验（InvalidArguments 的来源）
+│   ├── catch_unwind.rs           异步 panic 捕获：包住 Future::poll 的 CatchUnwind
+│   ├── scheduler/
+│   │   ├── mod.rs                Scheduler trait + UnitConfig / TaskOutcome
+│   │   ├── state.rs              单元状态机 UnitState + 合法迁移表
+│   │   ├── unit.rs               虚拟进程执行单元：心跳、配额、超时、取消
+│   │   └── reaper.rs             空闲回收 / max_lifetime 回收
+│   ├── registry/
+│   │   ├── mod.rs                ToolRegistry trait
+│   │   └── impl_registry.rs      call_tool 完整分流逻辑（四步检查 + 分流执行）
+│   ├── restart.rs                RestartManager：指数退避 + 滑动窗口熔断 + 重启流程
+│   ├── signature/
+│   │   ├── mod.rs                SignatureVerifier trait + PluginPackage + 校验结果
+│   │   ├── ed25519_verifier.rs   Ed25519 实现（公钥内置、私钥官方持有）
+│   │   └── revocation.rs         吊销列表（自身签名，未验签 fail-closed）
+│   ├── loader.rs                 插件加载：验签 → 决定 trust_level（失败降级到沙箱）
+│   └── mcp.rs                    MCP tools/list、tools/call 适配层
+├── examples/
+│   └── host_demo.rs              端到端演示：一个可信插件 + 一个沙箱插件 + 崩溃重启
+└── tests/
+    ├── registry_acl.rs           注册表 ACL / 错误码 / 分流
+    ├── panic_capture.rs          可信插件 HandlerPanic，宿主存活
+    ├── sandbox_timeout.rs        超时可中断 vs 不可中断升级崩溃
+    ├── restart_backoff.rs        退避序列 1/2/4/8/…/30 与滑动窗口熔断
+    └── signature_downgrade.rs    验签失败降级到沙箱、吊销列表 fail-closed</pre></div>
+
+    <h3 id="apx-a-layers"><span class="lang-zh">分层</span><span class="lang-en">Layers</span></h3>
+    <table class="tbl">
+      <tr><th><span class="lang-zh">层</span><span class="lang-en">Layer</span></th><th><span class="lang-zh">模块</span><span class="lang-en">Modules</span></th><th><span class="lang-zh">职责</span><span class="lang-en">Responsibility</span></th></tr>
+      <tr><td>L0 <span class="lang-zh">基础</span><span class="lang-en">Foundation</span></td><td><code>error</code> <code>types</code> <code>json</code></td><td><span class="lang-zh">错误码、元数据、schema 校验。无异步、无锁</span><span class="lang-en">Error codes, metadata, schema validation. No async, no locks</span></td></tr>
+      <tr><td>L1 <span class="lang-zh">执行</span><span class="lang-en">Execution</span></td><td><code>catch_unwind</code> <code>scheduler</code></td><td><span class="lang-zh">虚拟进程执行单元、超时、取消、配额、状态机</span><span class="lang-en">Virtual-process execution units, timeout, cancellation, quotas, state machine</span></td></tr>
+      <tr><td>L2 <span class="lang-zh">编排</span><span class="lang-en">Orchestration</span></td><td><code>registry</code> <code>restart</code></td><td><span class="lang-zh">工具登记与 ACL、四步检查分流、退避重启与熔断</span><span class="lang-en">Tool registration &amp; ACL, four-step check routing, backoff restart &amp; circuit breaking</span></td></tr>
+      <tr><td>L3 <span class="lang-zh">信任</span><span class="lang-en">Trust</span></td><td><code>signature</code> <code>loader</code></td><td><span class="lang-zh">包整体验签、吊销列表、降级决策</span><span class="lang-en">Whole-package verification, revocation list, degradation decisions</span></td></tr>
+      <tr><td>L4 <span class="lang-zh">对外</span><span class="lang-en">Interface</span></td><td><code>mcp</code></td><td><span class="lang-zh">与 MCP 无状态语义对齐（无 initialize 握手）</span><span class="lang-en">Stateless MCP semantics alignment (no initialize handshake)</span></td></tr>
+    </table>
+    <p>
+      <span class="lang-zh">依赖方向严格单向：<code>L4 → L2 → L1 → L0</code>，L3 只被 L2 / 入口使用，L1 不认识 L3。<code>scheduler</code> 不知道「签名」存在，<code>restart</code> 不知道「工具表」存在（通过回调与注册表解耦）。</span>
+      <span class="lang-en">Strictly one-way dependencies: <code>L4 → L2 → L1 → L0</code>; L3 is consumed only by L2 / the entry point; L1 never knows about L3. <code>scheduler</code> has no idea "signatures" exist; <code>restart</code> knows nothing about the "tool table" (decoupled via callbacks).</span>
+    </p>
+
+    <h3 id="apx-a-tradeoffs"><span class="lang-zh">关键设计取舍（先看这三条）</span><span class="lang-en">Key Trade-offs (Read These Three First)</span></h3>
+    <ol class="plain">
+      <li><b><span class="lang-zh">沙箱单元不是线程，也不是线程池条目。</span><span class="lang-en">A sandbox unit is not a thread, nor a pool slot.</span></b>
+        <span class="lang-zh">它是一份 <code>UnitConfig</code> + 一组原子计数器（状态、心跳、并发配额、调用速率窗口）+ 一个代数（generation，用于让旧单元的迟到回调失效）。执行 handler 的仍是宿主的同一套 tokio 线程池——这正是「单 OS 进程内逻辑隔离」的物理含义。</span>
+        <span class="lang-en">It is a <code>UnitConfig</code> + a set of atomic counters (state, heartbeat, concurrency quota, rate window) + a generation counter (to invalidate late callbacks from old units). Handlers still run on the host's own tokio pool — that is the physical meaning of "logical isolation within one OS process".</span></li>
+      <li><b><span class="lang-zh">超时计时器与被测 handler 不在同一个 future 里。</span><span class="lang-en">The timeout timer and the handler never share one future.</span></b>
+        <span class="lang-zh">handler 跑在独立 spawn 的 task 上，计时器在调用方 task 上 race，因此 handler 阻塞 poll 时计时器仍然能触发。这是能区分「可中断超时」和「不可中断超时」的前提。</span>
+        <span class="lang-en">The handler runs on an independently spawned task while the timer races on the caller's task, so the timer still fires even when the handler blocks inside poll. This is the precondition for distinguishing interruptible vs uninterruptible timeouts.</span></li>
+      <li><b><span class="lang-zh">可中断性靠心跳判定，不靠「abort 之后它死没死」。</span><span class="lang-en">Interruptibility is judged by the heartbeat, not by "did it die after abort".</span></b>
+        <span class="lang-zh">abort 只能在下一次 await 点生效，所以 <code>heartbeat</code> 在超时时刻是否前进，就是「可中断 / 不可中断」的判据。</span>
+        <span class="lang-en">abort only takes effect at the next await point, so whether <code>heartbeat</code> has advanced at timeout time is the criterion for interruptible vs not.</span></li>
+    </ol>
+  </section>
+
+  <!-- ============================================================
+       附录 B：docs/security-boundary.md 内嵌
+       ============================================================ -->
+  <section class="doc" id="appendix-b">
+    <h2 class="doc-title" id="apx-b-top"><span class="sec-no">B</span><span class="lang-zh">附录 · 安全边界声明</span><span class="lang-en">Appendix · Security Boundary</span></h2>
+    <p class="dim">
+      <span class="lang-zh">本节是 <a class="inl" href="docs/security-boundary.md">docs/security-boundary.md</a> 的完整内嵌版本。</span>
+      <span class="lang-en">Full inline copy of <a class="inl" href="docs/security-boundary.md">docs/security-boundary.md</a>.</span>
+    </p>
+    <div class="note warn">
+      <span class="tag">! </span>
+      <span class="lang-zh">它不是「注意事项」，而是<b>这套架构的诚实边界</b>：下面每一条都是「当前实现做不到」或「做不到保证」的地方，请按此评估风险。</span>
+      <span class="lang-en">This is not a list of "tips" — it is the <b>honest boundary of this architecture</b>: every item below is something the current implementation cannot do or cannot guarantee. Assess risk accordingly.</span>
+    </div>
+
+    <h3 id="apx-b-trusted">1. <span class="lang-zh">可信插件与宿主同等权限</span><span class="lang-en">Trusted Plugins Have Host-Level Privilege</span></h3>
+    <p>
+      <span class="lang-zh">可信插件（签名有效且未被吊销）直接运行在<b>宿主进程的同一执行上下文</b>中。这意味着：</span>
+      <span class="lang-en">A trusted plugin (valid signature, not revoked) runs in <b>the same execution context as the host process</b>. Consequences:</span>
+    </p>
+    <table class="tbl">
+      <tr><th><span class="lang-zh">威胁</span><span class="lang-en">Threat</span></th><th><span class="lang-zh">是否拦得住</span><span class="lang-en">Stops it?</span></th><th><span class="lang-zh">拦不住的原因</span><span class="lang-en">Why not</span></th></tr>
+      <tr><td>Rust <code>panic!</code> / <code>unwrap()</code> <span class="lang-zh">失败</span><span class="lang-en">failure</span></td><td><span class="ok">✓ <span class="lang-zh">拦得住</span><span class="lang-en">Yes</span></span></td><td><code>catch_unwind</code> <span class="lang-zh">包住每次</span><span class="lang-en">wraps every</span> <code>Future::poll</code></td></tr>
+      <tr><td><code>std::process::abort()</code></td><td><span class="no">✗</span></td><td><span class="lang-zh">进程立刻终止，unwind 表无用</span><span class="lang-en">process dies immediately; unwind tables are useless</span></td></tr>
+      <tr><td><code>std::process::exit(0)</code></td><td><span class="no">✗</span></td><td><span class="lang-zh">同上</span><span class="lang-en">same as above</span></td></tr>
+      <tr><td><span class="lang-zh">段错误 / UB / 野指针</span><span class="lang-en">Segfault / UB / wild pointers</span></td><td><span class="no">✗</span></td><td><span class="lang-zh">是 OS 层信号，不是 Rust unwind</span><span class="lang-en">OS-level signals, not Rust unwinding</span></td></tr>
+      <tr><td>OOM</td><td><span class="no">✗</span></td><td><span class="lang-zh">共享 allocator，OS 直接杀进程</span><span class="lang-en">shared allocator; the OS kills the process</span></td></tr>
+      <tr><td><code>panic = "abort"</code> <span class="lang-zh">编译的任何 panic</span><span class="lang-en">any panic built with abort</span></td><td><span class="no">✗</span></td><td>abort <span class="lang-zh">模式不生成 unwind 表</span><span class="lang-en">mode emits no unwind tables</span></td></tr>
+      <tr><td><code>extern "C"</code> <span class="lang-zh">边界的 panic</span><span class="lang-en">panic across FFI boundary</span></td><td><span class="no">✗</span></td><td><span class="lang-zh">Rust 里这是 UB，无法可靠捕获</span><span class="lang-en">this is UB in Rust; cannot be reliably caught</span></td></tr>
+      <tr><td><span class="lang-zh">读其他插件/宿主的内存</span><span class="lang-en">Reading host / other plugin memory</span></td><td><span class="no">✗</span></td><td><span class="lang-zh">同一地址空间，无进程边界</span><span class="lang-en">same address space, no process boundary</span></td></tr>
+      <tr><td><span class="lang-zh">调用任意宿主内部函数</span><span class="lang-en">Calling any host-internal function</span></td><td><span class="no">✗</span></td><td><span class="lang-zh">Rust 没有 API 白名单机制</span><span class="lang-en">Rust has no API-allowlisting mechanism</span></td></tr>
+    </table>
+    <div class="note danger">
+      <span class="tag">! </span>
+      <b><span class="lang-zh">唯一的防线是签名校验。</span><span class="lang-en">The only line of defense is signature verification.</span></b>
+      <span class="lang-zh">一旦一个恶意包通过了验签（例如官方私钥泄露），它就能做上述任何事。因此<b>私钥保管与吊销响应速度是这套架构的安全等级上限</b>，而不是代码里的隔离措施。</span>
+      <span class="lang-en">Once a malicious package passes verification (e.g. leaked official key), it can do all of the above. <b>Key custody and revocation response speed define the security ceiling</b> — not any in-code isolation.</span>
+    </div>
+    <p>
+      <b><span class="lang-zh">实践建议</span><span class="lang-en">Practical advice</span></b>：
+      <span class="lang-zh">把「可信」级别只授予你自己团队编写的、经过 review 的插件。第三方插件即使能拿到签名，也应考虑强制走沙箱（见 <a class="inl" href="#appendix-c">附录 C · Q1</a>）。</span>
+      <span class="lang-en">Grant "trusted" only to plugins written and reviewed by your own team. Third-party plugins should be forced into the sandbox even if they carry a valid signature (see <a class="inl" href="#appendix-c">Appendix C · Q1</a>).</span>
+    </p>
+
+    <h3 id="apx-b-sandbox">2. <span class="lang-zh">沙箱插件不是安全沙箱</span><span class="lang-en">The Sandboxed Unit Is Not a Security Sandbox</span></h3>
+    <p>
+      <span class="lang-zh">「虚拟进程执行单元」是调度器内的一个<b>数据结构</b>：</span>
+      <span class="lang-en">The "virtual-process execution unit" is a <b>data structure</b> inside the scheduler:</span>
+    </p>
+    <div class="codeblock" data-lang="rust" data-file="Unit (scheduler data structure)">
+      <div class="cb-head"><span class="cb-lang">rust</span><button class="cb-copy">Copy</button></div>
+<pre>Unit {
+    handle: UnitHandle,          // plugin_id + generation
+    config: UnitConfig,          // 配额参数
+    state: AtomicU8,             // Running / Crashed / ...
+    in_flight: AtomicU32,        // 并发计数
+    slots: Mutex&lt;HashMap&lt;..&gt;&gt;,   // 在飞任务（用于 cancel / abort）
+    rate: Mutex&lt;RateWindow&gt;,     // 调用速率窗口
+}</pre>
+    </div>
+    <p>
+      <span class="lang-zh">执行 handler 的是宿主 tokio 线程池的 worker 线程。<b>没有</b> fork、子进程、WASM 实例、独立地址空间。</span>
+      <span class="lang-en">Handlers run on the host tokio pool's worker threads. <b>No</b> fork, no child process, no WASM instance, no separate address space.</span>
+    </p>
+    <p><b><span class="lang-zh">它提供的隔离</span><span class="lang-en">Isolation it does provide</span></b>：</p>
+    <ul class="plain">
+      <li><b><span class="lang-zh">逻辑隔离</span><span class="lang-en">Logical isolation</span></b> — <span class="lang-zh">状态、配额、超时、崩溃后重建，互不污染；</span><span class="lang-en">state, quotas, timeouts, crash-and-rebuild stay independent;</span></li>
+      <li><b><span class="lang-zh">API 限制</span><span class="lang-en">API restriction</span></b> — <span class="lang-zh">插件只能通过工具注册表暴露的函数调用其他插件（框架层面成立，但 Rust 无法在语言层阻止恶意代码直接调用宿主内部函数）；</span><span class="lang-en">plugins reach other plugins only through registry-exposed functions (holds at the framework level, though Rust cannot stop malicious code calling host internals at the language level);</span></li>
+      <li><b><span class="lang-zh">资源配额</span><span class="lang-en">Resource quotas</span></b> — <span class="lang-zh">并发数、调用速率、返回体积、生命周期（空闲 / 最长存活）。</span><span class="lang-en">concurrency, call rate, response size, lifetime (idle / max-age).</span></li>
+    </ul>
+    <p><b><span class="lang-zh">它不能提供的隔离</span><span class="lang-en">Isolation it cannot provide</span></b>：</p>
+    <table class="tbl">
+      <tr><th><span class="lang-zh">威胁</span><span class="lang-en">Threat</span></th><th><span class="lang-zh">是否拦得住</span><span class="lang-en">Stops it?</span></th><th><span class="lang-zh">说明</span><span class="lang-en">Why</span></th></tr>
+      <tr><td><span class="lang-zh">读宿主或其他插件内存</span><span class="lang-en">Reading host / plugin memory</span></td><td><span class="no">✗</span></td><td><span class="lang-zh">同一地址空间</span><span class="lang-en">same address space</span></td></tr>
+      <tr><td><span class="lang-zh">直接调用宿主内部 API</span><span class="lang-en">Calling host-internal APIs</span></td><td><span class="no">✗</span></td><td><span class="lang-zh">Rust 无 API 白名单机制</span><span class="lang-en">no API-allowlisting mechanism in Rust</span></td></tr>
+      <tr><td><span class="lang-zh">耗尽内存</span><span class="lang-en">Memory exhaustion</span></td><td><span class="no">✗</span></td><td><code>memory_limit_bytes</code> <span class="lang-zh">是<b>声明性字段</b>，无法强制执行</span><span class="lang-en">is a <b>declarative field</b>, unenforceable</span></td></tr>
+      <tr><td><span class="lang-zh">逃逸到 native</span><span class="lang-en">Escaping to native</span></td><td><span class="no">✗</span></td><td><span class="lang-zh">本身就是 native 代码</span><span class="lang-en">it already is native code</span></td></tr>
+      <tr><td><span class="lang-zh">无限循环占满一个 worker</span><span class="lang-en">Infinite loop pinning a worker</span></td><td><span class="part">△ <span class="lang-zh">部分</span><span class="lang-en">Partial</span></span></td><td><span class="lang-zh">能被探针判定为「不可中断」并升级为单元崩溃，但<b>该线程在被判定之前一直被占用</b></span><span class="lang-en">probes can declare it "uninterruptible" and crash the unit, but <b>the thread stays pinned until then</b></span></td></tr>
+    </table>
+
+    <h4><span class="lang-zh">关于</span><span class="lang-en">About</span> <code>memory_limit_bytes</code> <span class="lang-zh">的诚实说明</span><span class="lang-en">— an honest note</span></h4>
+    <p>
+      <span class="lang-zh"><code>UnitConfig::memory_limit_bytes</code> 在纯 Rust 单元里<b>无法强制执行</b>：宿主线程与 handler 共享同一 allocator 与地址空间，没有 per-unit 的计量点。它当前的作用是：</span>
+      <span class="lang-en"><code>UnitConfig::memory_limit_bytes</code> is <b>unenforceable</b> in a pure-Rust unit: host threads and handlers share the allocator and address space, and there is no per-unit metering point. Its current roles:</span>
+    </p>
+    <ol class="plain">
+      <li><span class="lang-zh">通过 <code>list_units()</code> 透出给 UI，让用户看到插件声明的内存预算；</span><span class="lang-en">surfaced to the UI via <code>list_units()</code> so users can see the declared budget;</span></li>
+      <li><span class="lang-zh">作为未来 WASM 沙箱实现的配置入口。</span><span class="lang-en">as the config entry point for a future WASM sandbox implementation.</span></li>
+    </ol>
+    <div class="note danger">
+      <span class="tag">! </span>
+      <b><span class="lang-zh">要真正强制执行内存上限，唯一的路径是把沙箱执行单元实现为 WASM 字节码沙箱</span><span class="lang-en">The only path to enforcing memory limits is a WASM bytecode sandbox</span></b>
+      <span class="lang-zh">（自有线性内存 + 指令计量 + 无 native 逃逸）。在此之前，请不要把这个字段理解为「内存被限制了」。</span>
+      <span class="lang-en">(own linear memory + instruction metering + no native escape). Until then, do not read this field as "memory is limited".</span>
+    </div>
+
+    <h4><span class="lang-zh">关于「不可中断」的实质</span><span class="lang-en">What "uninterruptible" really means</span></h4>
+    <p>
+      <span class="lang-zh"><code>std::thread::sleep</code> / 密集计算这类不产生 await 点的代码，<code>abort()</code> 是<b>无效</b>的：</span>
+      <span class="lang-en">For code that never hits an await point (<code>std::thread::sleep</code>, busy computation), <code>abort()</code> is <b>ineffective</b>:</span>
+    </p>
+    <ul class="plain">
+      <li><b><span class="lang-zh">我们能做的</span><span class="lang-en">What we can do</span></b> — <span class="lang-zh">通过探针判定它卡在 poll 内，把整个单元标记为 <code>Crashed</code> 并触发重启；</span><span class="lang-en">probes detect the stuck poll, mark the unit <code>Crashed</code> and trigger a restart;</span></li>
+      <li><b><span class="lang-zh">我们不能做的</span><span class="lang-en">What we cannot do</span></b> — <span class="lang-zh">抢占那个正被占用的 OS 线程。</span><span class="lang-en">preempt the pinned OS thread.</span></li>
+    </ul>
+    <p class="dim">
+      <span class="lang-zh">因此一个恶意的、写死循环的沙箱插件仍然可以在被判定前的一段时间内吃满一个 worker。缓解手段是保证 tokio worker 数 ≥ 2，并在 <code>uninterruptible_grace_ms</code> 之后立刻判定。</span>
+      <span class="lang-en">A malicious sandboxed plugin with a hard infinite loop can still saturate one worker for a while before judgment. Mitigation: keep tokio workers ≥ 2 and judge right after <code>uninterruptible_grace_ms</code>.</span>
+    </p>
+
+    <h3 id="apx-b-restart">3. <span class="lang-zh">重启管理器不覆盖可信插件</span><span class="lang-en">The Restart Manager Never Covers Trusted Plugins</span></h3>
+    <p>
+      <span class="lang-zh"><code>RestartManager</code> 只订阅<b>沙箱单元</b>的崩溃事件（<code>Scheduler::on_crash</code>）：</span>
+      <span class="lang-en"><code>RestartManager</code> only subscribes to crash events of <b>sandbox units</b> (<code>Scheduler::on_crash</code>):</span>
+    </p>
+    <ul class="plain">
+      <li><span class="lang-zh">可信插件不在调度器里 → 没有单元 → 没有崩溃事件 → 重启管理器看不到它；</span><span class="lang-en">trusted plugins are not in the scheduler → no unit → no crash events → invisible to the restart manager;</span></li>
+      <li><span class="lang-zh">可信插件的 panic 由 <code>catch_unwind</code> 捕获并返回 <code>HandlerPanic</code>，<b>宿主继续运行</b>，该工具<b>不会</b>被重启（它没有进程可重启，代码就在宿主里）；</span><span class="lang-en">a trusted plugin's panic is captured by <code>catch_unwind</code> and returned as <code>HandlerPanic</code>; the <b>host keeps running</b> and the tool is <b>not</b> restarted (there is no process to restart — the code lives in the host);</span></li>
+      <li><span class="lang-zh">可信插件若发生 abort / 段错误 / OOM → <b>宿主进程已死</b>，恢复只能靠用户重启启动器。</span><span class="lang-en">if a trusted plugin aborts / segfaults / OOMs → <b>the host process is dead</b>; recovery means the user restarts the launcher.</span></li>
+    </ul>
+    <p class="dim">
+      <span class="lang-zh">代码里的证据：<code>RestartManager::watch_plugin</code> 只被 <code>PluginLoader::load_sandboxed</code> 调用；<code>load_trusted</code> 路径里不出现 <code>create_unit</code>，也不出现 <code>watch_plugin</code>。测试 <code>restart_manager_only_manages_sandboxed_plugins</code> 断言了这一点。</span>
+      <span class="lang-en">Evidence in code: <code>RestartManager::watch_plugin</code> is only called from <code>PluginLoader::load_sandboxed</code>; the <code>load_trusted</code> path contains neither <code>create_unit</code> nor <code>watch_plugin</code>. Test <code>restart_manager_only_manages_sandboxed_plugins</code> asserts this.</span>
+    </p>
+
+    <h3 id="apx-b-degrade">4. <span class="lang-zh">「降级 vs 拒绝」的边界</span><span class="lang-en">The "Degrade vs Reject" Boundary</span></h3>
+    <p>
+      <span class="lang-zh">规格说「签名校验失败时降级到沙箱，不拒绝加载」。但不是<b>所有</b>校验失败都该降级：</span>
+      <span class="lang-en">The spec says "verification failure degrades to sandbox, never rejects". But not <b>every</b> failure should degrade:</span>
+    </p>
+    <table class="tbl">
+      <tr><th><span class="lang-zh">情况</span><span class="lang-en">Case</span></th><th><span class="lang-zh">处理</span><span class="lang-en">Handling</span></th><th><span class="lang-zh">理由</span><span class="lang-en">Reason</span></th></tr>
+      <tr><td><span class="lang-zh">无签名</span><span class="lang-en">Unsigned</span></td><td><span class="lang-zh">降级到沙箱</span><span class="lang-en">degrade to sandbox</span></td><td><span class="lang-zh">规格明文要求</span><span class="lang-en">explicitly required by spec</span></td></tr>
+      <tr><td><span class="lang-zh">签名无效（摘要不符）</span><span class="lang-en">Invalid signature (digest mismatch)</span></td><td><span class="lang-zh">降级到沙箱</span><span class="lang-en">degrade</span></td><td><span class="lang-zh">规格明文要求</span><span class="lang-en">spec-mandated</span></td></tr>
+      <tr><td><span class="lang-zh">签名者被吊销</span><span class="lang-en">Signer revoked</span></td><td><span class="lang-zh">降级到沙箱</span><span class="lang-en">degrade</span></td><td><span class="lang-zh">规格明文要求</span><span class="lang-en">spec-mandated</span></td></tr>
+      <tr><td><span class="lang-zh">算法不支持</span><span class="lang-en">Unsupported algorithm</span></td><td><span class="lang-zh">降级到沙箱</span><span class="lang-en">degrade</span></td><td><span class="lang-zh">等价于「无法验证」</span><span class="lang-en">equivalent to "unverifiable"</span></td></tr>
+      <tr><td><span class="lang-zh">吊销列表自身验签失败</span><span class="lang-en">Revocation list itself fails verification</span></td><td><b><span class="lang-zh">所有插件</span><span class="lang-en">all plugins</span></b> <span class="lang-zh">降级到沙箱</span><span class="lang-en">degrade</span></td><td>fail-closed：<span class="lang-zh">无法判断谁被吊销</span><span class="lang-en">cannot tell who is revoked</span></td></tr>
+      <tr><td><b><span class="lang-zh">运行期发现包摘要变化</span><span class="lang-en">Runtime digest change detected</span></b></td><td><b><span class="lang-zh">标记 Failed，不重启</span><span class="lang-en">mark Failed, no restart</span></b></td><td><span class="lang-zh">这不是「没签名」，是签名之后被改写；重启会执行被篡改的代码</span><span class="lang-en">this is not "unsigned" — it was rewritten after signing; a restart would run tampered code</span></td></tr>
+      <tr><td><span class="lang-zh">清单缺失 / plugin_id 不一致</span><span class="lang-en">Missing manifest / plugin_id mismatch</span></td><td><b><span class="lang-zh">拒绝加载</span><span class="lang-en">reject load</span></b></td><td><span class="lang-zh">不知道 plugin_id 就无法安全分派</span><span class="lang-en">without plugin_id there is no safe dispatch</span></td></tr>
+    </table>
+    <p class="dim">
+      <span class="lang-zh">最后两条是本实现相对规格的延伸，已在 <a class="inl" href="#appendix-c">附录 C</a>（Q2 / Q5 相关）里列出待确认。</span>
+      <span class="lang-en">The last two rows extend beyond the spec and are listed for confirmation in <a class="inl" href="#appendix-c">Appendix C</a> (Q2 / Q5).</span>
+    </p>
+
+    <h3 id="apx-b-build">5. <span class="lang-zh">宿主构建配置的硬要求</span><span class="lang-en">Hard Build Requirements for the Host</span></h3>
+    <ol class="plain">
+      <li><b><code>panic = "unwind"</code></b><span class="lang-zh">（默认）。若宿主用 <code>abort</code>，可信插件机制不成立 —— 请不要在那种模式下启用可信插件。</span><span class="lang-en">(the default). With <code>abort</code> the trusted-plugin mechanism is void — never enable trusted plugins in that mode.</span></li>
+      <li><b>tokio <code>multi_thread</code>，<code>worker_threads &gt;= 2</code></b>。<span class="lang-zh">单 worker 时，一个不可中断的 handler 会占死唯一 worker，超时计时器与状态收敛全部停摆，「逻辑隔离」名存实亡。</span><span class="lang-en">With a single worker, one uninterruptible handler pins the only worker; timers and state convergence all stall, and "logical isolation" exists in name only.</span></li>
+      <li><b><span class="lang-zh">单进程</span><span class="lang-en">Single process</span></b>。<span class="lang-zh">不要为了「更安全」而给插件起子进程 —— 那违反本框架的进程模型前提（规格第 1 节），并且会引入 IPC 面，反而扩大攻击面。</span><span class="lang-en">Do not spawn child processes for plugins "for safety" — it violates the framework's process-model premise (spec §1) and adds an IPC surface, widening the attack surface instead.</span></li>
+    </ol>
+  </section>
+
+  <!-- ============================================================
+       附录 C：docs/open-questions.md 内嵌
+       ============================================================ -->
+  <section class="doc" id="appendix-c">
+    <h2 class="doc-title" id="apx-c-top"><span class="sec-no">C</span><span class="lang-zh">附录 · 遗留决策清单</span><span class="lang-en">Appendix · Open Decisions</span></h2>
+    <p class="dim">
+      <span class="lang-zh">本节是 <a class="inl" href="docs/open-questions.md">docs/open-questions.md</a> 的完整内嵌版本：规格里没有写死、或实现做了<b>超出规格的决策</b>的地方，每一条都给了当前选择与理由，方便逐条裁决。</span>
+      <span class="lang-en">Full inline copy of <a class="inl" href="docs/open-questions.md">docs/open-questions.md</a>: every place the spec left open or the implementation decided <b>beyond the spec</b>, each with the current choice, rationale and impact.</span>
+    </p>
+
+    <h3 id="apx-c-q1">Q1. <span class="lang-zh">「无吊销列表」的发行版该怎么处理？</span><span class="lang-en">Shipping without a revocation list?</span> <span class="inline-code"><span class="lang-zh">影响 · 安全等级 · 高</span><span class="lang-en">impact · security · high</span></span></h3>
+    <p>
+      <b><span class="lang-zh">现状</span><span class="lang-en">Status</span></b>：
+      <span class="lang-zh"><code>Ed25519Verifier</code> 默认 <code>require_revocation_list = true</code>。未装载吊销列表时<b>所有</b>插件都判 <code>RevocationUnverifiable</code> → 全部降级到沙箱（fail-closed）。</span>
+      <span class="lang-en"><code>Ed25519Verifier</code> defaults to <code>require_revocation_list = true</code>. Without a loaded list, <b>every</b> plugin is judged <code>RevocationUnverifiable</code> → degraded to sandbox (fail-closed).</span>
+    </p>
+    <p>
+      <b><span class="lang-zh">问题</span><span class="lang-en">Problem</span></b>：
+      <span class="lang-zh">规格说「吊销列表随启动器更新」，但没写「如果启动器没带吊销列表怎么办」。如果发布流程存在「首次启动 / 离线环境 / 吊销库尚未下载」的窗口，默认 fail-closed 会让<b>所有</b>插件（包括官方签名的）在那一刻降级为沙箱。</span>
+      <span class="lang-en">The spec says the revocation list ships with launcher updates but never says what happens when the launcher has none. If the release flow has a "first launch / offline / list not yet downloaded" window, fail-closed degrades <b>every</b> plugin — including officially signed ones — during that window.</span>
+    </p>
+    <p>
+      <b><span class="lang-zh">当前选择</span><span class="lang-en">Current choice</span></b>：
+      <span class="lang-zh">默认 fail-closed，同时提供 <code>.without_required_revocation_list()</code> 逃生门。三选一 —— (a) 保持 fail-closed，吊销列表必须随二进制打包（推荐，最安全）；(b) 允许「无列表 = 无人被吊销」（启动更快，但被吊销的插件在这个窗口里能拿到可信权限）；(c) 无列表时只信任「内嵌在二进制里的核心插件」，其余降级。</span>
+      <span class="lang-en">fail-closed by default, with a <code>.without_required_revocation_list()</code> escape hatch. Three options — (a) keep fail-closed, bundle the list with the binary (recommended, safest); (b) treat "no list = nobody revoked" (faster start, but revoked plugins get trusted privileges in that window); (c) trust only core plugins embedded in the binary, degrade the rest.</span>
+    </p>
+    <div class="note warn"><span class="tag"><span class="lang-zh">待定</span><span class="lang-en">TBD</span></span><span class="lang-zh">需要你裁决：三选一。</span><span class="lang-en">Needs your decision: pick one of three.</span></div>
+
+    <h3 id="apx-c-q2">Q2. <span class="lang-zh">「运行期包被篡改」该降级还是拒绝？</span><span class="lang-en">Runtime tampering: degrade or reject?</span> <span class="inline-code"><span class="lang-zh">影响 · 加载策略 · 中</span><span class="lang-en">impact · loading · medium</span></span></h3>
+    <p>
+      <b><span class="lang-zh">现状</span><span class="lang-en">Status</span></b>：
+      <span class="lang-zh">重启时重新验签，若发现 <code>package.digest() != loaded_digest</code>（运行期间包文件被改写），<b>标记 Failed 并停止自动重启</b>，而不是降级到沙箱继续跑。</span>
+      <span class="lang-en">On restart, re-verification compares <code>package.digest() != loaded_digest</code>; if the package was rewritten at runtime, it is <b>marked Failed and auto-restart stops</b> instead of degrading into the sandbox.</span>
+    </p>
+    <p>
+      <b><span class="lang-zh">理由</span><span class="lang-en">Rationale</span></b>：
+      <span class="lang-zh">这不是「没签名」，而是「签名之后内容被改」。降级会让篡改后的代码在受限环境里执行；停止则明确告诉用户「这个包不可信了」。<b>但</b>规格只说了「校验失败 → 降级」，这一条严格讲超出了规格。</span>
+      <span class="lang-en">This is not "unsigned" — content was modified after signing. Degradation would run tampered code in a restricted env; stopping clearly tells the user the package is untrustworthy. <b>However</b> the spec only says "verification failure → degrade", so this strictly exceeds the spec.</span>
+    </p>
+    <div class="note warn"><span class="tag"><span class="lang-zh">待定</span><span class="lang-en">TBD</span></span><span class="lang-zh">接受「篡改 → Failed」，还是要求一律降级？</span><span class="lang-en">Accept "tampered → Failed", or require unconditional degradation?</span></div>
+
+    <h3 id="apx-c-q3">Q3. <span class="lang-zh">热重载时信任级别变化怎么处理？</span><span class="lang-en">Trust-level changes across hot reload?</span> <span class="inline-code"><span class="lang-zh">影响 · 生命周期 · 中</span><span class="lang-en">impact · lifecycle · medium</span></span></h3>
+    <p>
+      <b><span class="lang-zh">现状</span><span class="lang-en">Status</span></b>：
+      <span class="lang-zh"><code>PluginLoader::hot_reload</code> <b>拒绝</b>跨级别迁移（Sandboxed ↔ Trusted），返回明确错误，要求先卸载再加载；同级迁移正常支持。</span>
+      <span class="lang-en"><code>PluginLoader::hot_reload</code> <b>rejects</b> cross-level migration (Sandboxed ↔ Trusted) with an explicit error, requiring unload + reload; same-level migration works normally.</span>
+    </p>
+    <p>
+      <b><span class="lang-zh">难点</span><span class="lang-en">Difficulty</span></b>：
+      <span class="lang-zh">升级需要原子地切换已在册工具的 <code>trust_level</code>、<code>unit_handle</code>（清空）与 handler 来源。中途若有在飞调用，会出现「半可信」状态。当前选择是保守拒绝：跨执行上下文迁移一旦做错，就是把不可信代码提权到宿主，风险远大于「让用户手动重载」。</span>
+      <span class="lang-en">Upgrading requires atomically switching registered tools' <code>trust_level</code>, <code>unit_handle</code> (cleared) and handler source; in-flight calls mid-switch create a "half-trusted" state. Current choice is conservative rejection: a botched cross-context migration promotes untrusted code into the host — far riskier than asking the user to reload manually.</span>
+    </p>
+    <div class="note warn"><span class="tag"><span class="lang-zh">待定</span><span class="lang-en">TBD</span></span><span class="lang-zh">是否值得实现原子迁移？（若实现，建议「卸载 + 重载」，并在 UI 显示「插件需要重启以应用新的信任级别」。）</span><span class="lang-en">Is atomic migration worth implementing? (If so: unload + reload, with a UI notice "plugin restart required to apply new trust level".)</span></div>
+
+    <h3 id="apx-c-q4">Q4. <code>cancel</code> <span class="lang-zh">遇到「任务已结束」该返回什么？</span><span class="lang-en">— what should cancel of a finished task return?</span> <span class="inline-code"><span class="lang-zh">影响 · 接口语义 · 低</span><span class="lang-en">impact · API semantics · low</span></span></h3>
+    <p>
+      <b><span class="lang-zh">现状</span><span class="lang-en">Status</span></b>：
+      <span class="lang-zh"><code>CancelOutcome</code> 有 5 个变体，规格只定义了 2 个（<code>Cancelled</code> / <code>Uninterruptible</code>），实现补了 <code>AlreadyFinished</code> / <code>AlreadyTimedOut</code> / <code>NotFound</code> —— 塞进 <code>Cancelled</code> 是在说谎，塞进 <code>Uninterruptible</code> 会误导调用方去重启插件。</span>
+      <span class="lang-en"><code>CancelOutcome</code> has 5 variants; the spec defines only 2 (<code>Cancelled</code> / <code>Uninterruptible</code>). The implementation adds <code>AlreadyFinished</code> / <code>AlreadyTimedOut</code> / <code>NotFound</code> — collapsing them into <code>Cancelled</code> would lie, into <code>Uninterruptible</code> would mislead callers into restarting the plugin.</span>
+    </p>
+    <p>
+      <b><span class="lang-zh">协议视图</span><span class="lang-en">Protocol view</span></b>：
+      <span class="lang-zh"><code>as_protocol_str()</code> 把前四个映射为 <code>"Cancelled"</code>，只有 <code>Uninterruptible</code> 映射为 <code>"Uninterruptible"</code> —— 对外的二元语义<b>完全符合规格</b>，多出来的变体只是内部精度。</span>
+      <span class="lang-en"><code>as_protocol_str()</code> maps the first four to <code>"Cancelled"</code> and only <code>Uninterruptible</code> to <code>"Uninterruptible"</code> — the external binary semantics <b>fully matches the spec</b>; extra variants are internal precision only.</span>
+    </p>
+    <div class="note warn"><span class="tag"><span class="lang-zh">待定</span><span class="lang-en">TBD</span></span><span class="lang-zh">认可这个扩展吗？还是要求严格二元返回？</span><span class="lang-en">Accept the extension, or require strict binary returns?</span></div>
+
+    <h3 id="apx-c-q5">Q5. <span class="lang-zh">参数校验放在第几步？</span><span class="lang-en">Which step does argument validation run at?</span> <span class="inline-code"><span class="lang-zh">影响 · 用户体验 · 低</span><span class="lang-en">impact · UX · low</span></span></h3>
+    <p>
+      <b><span class="lang-zh">现状</span><span class="lang-en">Status</span></b>：
+      <span class="lang-zh">检查顺序是 ①工具存在 → ②ACL → ③执行单元状态 → ④<b>参数校验</b> → ⑤分流执行。规格的四步检查里没有参数校验。放在状态检查之后是因为：插件正在重启时返回 <code>ProcessRestarting</code> 比 <code>InvalidArguments</code> 更准确 —— 用户改参数也没用，得等插件起来。替代方案是放在 ACL 之后、状态之前（参数错误立刻反馈，但重启期间会误导用户去改参数）。</span>
+      <span class="lang-en">Order: ①tool exists → ②ACL → ③unit state → ④<b>argument validation</b> → ⑤dispatch. The spec's four-step check omits validation. Placing it after state-check because, while a plugin is restarting, <code>ProcessRestarting</code> is more accurate than <code>InvalidArguments</code> — changing args won't help until the plugin is back. Alternative: right after ACL (instant feedback on bad args, but misleading during restarts).</span>
+    </p>
+    <div class="note warn"><span class="tag"><span class="lang-zh">待定</span><span class="lang-en">TBD</span></span><span class="lang-zh">保持现状，还是调整顺序？</span><span class="lang-en">Keep as-is, or reorder?</span></div>
+
+    <h3 id="apx-c-q6">Q6. <code>list_tools</code> <span class="lang-zh">的</span><span class="lang-en">'s</span> <code>available</code> <span class="lang-zh">与调用结果的组合语义</span><span class="lang-en">combination with call results</span> <span class="inline-code"><span class="lang-zh">影响 · UI · 低</span><span class="lang-en">impact · UI · low</span></span></h3>
+    <p>
+      <b><span class="lang-zh">现状</span><span class="lang-en">Status</span></b>：
+      <span class="lang-zh">重启期间 <code>list_tools</code> 返回 <code>available: false, reason: "restarting"</code>，而 <code>call_tool</code> 立即返回 <code>ProcessRestarting</code>。组合语义是「UI 灰掉按钮 + 若用户硬点则显示重启中」。<code>available</code> 是给 UI 的提示，不是准入开关 —— 真正的准入是 <code>call_tool</code> 里的状态检查。实现<b>允许调用但立即失败</b>（不排队），否则竞态窗口里「UI 显示可用但调用被拒」更令人困惑。</span>
+      <span class="lang-en">During restarts <code>list_tools</code> returns <code>available: false, reason: "restarting"</code> while <code>call_tool</code> immediately returns <code>ProcessRestarting</code> — i.e. "gray out the button; if the user insists, show 'restarting'". <code>available</code> is a UI hint, not an admission gate — real admission is the state check inside <code>call_tool</code>. The implementation <b>allows the call but fails it immediately</b> (no queueing); rejecting at the registry level instead would create the more confusing "UI says available but the call is rejected" race window.</span>
+    </p>
+    <div class="note warn"><span class="tag"><span class="lang-zh">待定</span><span class="lang-en">TBD</span></span><span class="lang-zh">认可吗？</span><span class="lang-en">Accept?</span></div>
+
+    <h3 id="apx-c-q7">Q7. <span class="lang-zh">沙箱崩溃的错误码粒度</span><span class="lang-en">Error-code granularity for sandbox crashes</span> <span class="inline-code"><span class="lang-zh">影响 · 可观测性 · 低</span><span class="lang-en">impact · observability · low</span></span></h3>
+    <p>
+      <b><span class="lang-zh">现状</span><span class="lang-en">Status</span></b>：
+      <span class="lang-zh">handler panic → <code>ProcessCrashed</code>；超时可中断 → <code>Timeout</code>；超时不可中断 → <code>Uninterruptible</code>（同时升级为单元级崩溃）；重启失败 → <code>ProcessFailed</code>；重启中 → <code>ProcessRestarting</code>。规格的 <code>ProcessCrashed</code> 与 <code>Uninterruptible</code> 有语义重叠（后者也是崩溃），实现让 <code>Uninterruptible</code> <b>优先</b>返回（更具体的原因），单元状态同时变为 <code>Crashed</code>。</span>
+      <span class="lang-en">handler panic → <code>ProcessCrashed</code>; interruptible timeout → <code>Timeout</code>; uninterruptible timeout → <code>Uninterruptible</code> (also escalated to unit crash); restart failure → <code>ProcessFailed</code>; restarting → <code>ProcessRestarting</code>. The spec's <code>ProcessCrashed</code> overlaps semantically with <code>Uninterruptible</code> (the latter is also a crash); the implementation returns <code>Uninterruptible</code> <b>first</b> (more specific cause) while the unit state becomes <code>Crashed</code>.</span>
+    </p>
+    <div class="note warn"><span class="tag"><span class="lang-zh">待定</span><span class="lang-en">TBD</span></span><span class="lang-zh">若希望协议层统一表现为 <code>ProcessCrashed</code>（<code>Uninterruptible</code> 仅作内部原因），可以改。当前选择是「更具体的错误码优先」。</span><span class="lang-en">If you prefer the protocol to always show <code>ProcessCrashed</code> (with <code>Uninterruptible</code> as internal cause only), that can change. Current choice: more specific code wins.</span></div>
+
+    <h3 id="apx-c-q8">Q8. <span class="lang-zh">是否要把沙箱换成真正的 WASM？</span><span class="lang-en">Replace the sandbox with a real WASM sandbox?</span> <span class="inline-code"><span class="lang-zh">影响 · 架构 · 大</span><span class="lang-en">impact · architecture · major</span></span></h3>
+    <p>
+      <b><span class="lang-zh">现状</span><span class="lang-en">Status</span></b>：
+      <span class="lang-zh"><code>memory_limit_bytes</code> 是<b>声明性字段</b>，无法强制执行（见 <a class="inl" href="#apx-b-sandbox">附录 B §2</a>）。如果产品定位里「沙箱」要能真正限制内存与 CPU，纯 Rust 单元架构做不到，必须把执行单元换成 WASM 字节码沙箱（wasmtime / wasmer 之类）。</span>
+      <span class="lang-en"><code>memory_limit_bytes</code> is <b>declarative</b> and unenforceable (see <a class="inl" href="#apx-b-sandbox">Appendix B §2</a>). If the product requires real memory/CPU limits, the pure-Rust unit cannot deliver; the unit must become a WASM bytecode sandbox (wasmtime / wasmer etc.).</span>
+    </p>
+    <p>
+      <b><span class="lang-zh">这是架构级决策</span><span class="lang-en">This is an architecture-level decision</span></b>，
+      <span class="lang-zh">会改变：handler 的形态（从 <code>Arc&lt;dyn Fn&gt;</code> 变成 WASM 导出函数）、参数/返回值通道（从 <code>serde_json::Value</code> 变成 WASM 内存里的序列化数据）、启动开销（实例化 WASM 模块 vs 直接调用）。若答案是「否」，应当<b>现在</b>改架构，而不是后面补 —— 因为 handler 的类型签名会变。</span>
+      <span class="lang-en">It changes: handler shape (<code>Arc&lt;dyn Fn&gt;</code> → WASM exports), the argument/return channel (<code>serde_json::Value</code> → serialization into WASM memory), and startup cost (module instantiation vs direct call). If the answer is "we need real limits", change it <b>now</b>, not later — the handler type signature is involved.</span>
+    </p>
+    <div class="note warn"><span class="tag"><span class="lang-zh">待定</span><span class="lang-en">TBD</span></span><span class="lang-zh">当前的「逻辑隔离 + 配额」是否满足产品需求？</span><span class="lang-en">Does current "logical isolation + quotas" satisfy the product requirements?</span></div>
+
+    <h3 id="apx-c-table"><span class="lang-zh">附：规格已完整落地的部分（无需确认）</span><span class="lang-en">Appendix: Spec Items Fully Implemented (no confirmation needed)</span></h3>
+    <table class="tbl">
+      <tr><th><span class="lang-zh">规格条目</span><span class="lang-en">Spec item</span></th><th><span class="lang-zh">落地位置</span><span class="lang-en">Implementation</span></th><th><span class="lang-zh">测试</span><span class="lang-en">Test</span></th></tr>
+      <tr><td><span class="lang-zh">单 OS 进程、无子进程/HTTP/socket/管道</span><span class="lang-en">Single OS process, no subprocess/HTTP/socket/pipe</span></td><td><span class="lang-zh">全局（依赖里无网络栈）</span><span class="lang-en">global (no network stack in deps)</span></td><td>—</td></tr>
+      <tr><td><span class="lang-zh">可信插件直接调用 + catch_unwind 包 poll</span><span class="lang-en">Trusted direct call + catch_unwind around poll</span></td><td><code>catch_unwind.rs</code> / <code>impl_registry.rs::dispatch_trusted</code></td><td><code>panic_capture.rs</code> (6)</td></tr>
+      <tr><td><span class="lang-zh">沙箱插件走调度器</span><span class="lang-en">Sandboxed plugins via scheduler</span></td><td><code>impl_registry.rs::dispatch_sandboxed</code></td><td><code>sandbox_semantics.rs</code></td></tr>
+      <tr><td><span class="lang-zh">验签失败降级（不拒绝）</span><span class="lang-en">Verification failure degrades (no reject)</span></td><td><code>loader.rs</code></td><td><code>signature_downgrade.rs</code></td></tr>
+      <tr><td><code>create_unit / submit / cancel / destroy / on_crash / get_state</code></td><td><code>scheduler/mod.rs</code></td><td><code>sandbox_semantics.rs</code></td></tr>
+      <tr><td><span class="lang-zh">工具级超时优先、不可中断升级崩溃</span><span class="lang-en">Tool timeout first; uninterruptible escalates to crash</span></td><td><code>scheduler/unit.rs</code></td><td>2 <span class="lang-zh">个专项测试</span><span class="lang-en">dedicated tests</span></td></tr>
+      <tr><td><code>cancel</code> <span class="lang-zh">能报</span><span class="lang-en">reports</span> <code>Uninterruptible</code></td><td><code>scheduler/unit.rs::cancel</code></td><td>2 <span class="lang-zh">个专项测试</span><span class="lang-en">dedicated tests</span></td></tr>
+      <tr><td><span class="lang-zh">工具元数据 9 个字段</span><span class="lang-en">9 tool-meta fields</span></td><td><code>types.rs::ToolMeta</code></td><td><code>types.rs</code> <span class="lang-zh">单测</span><span class="lang-en">unit tests</span></td></tr>
+      <tr><td><code>register/unregister/list/call/restart_unit</code></td><td><code>registry/</code></td><td><code>registry_acl.rs</code> (12)</td></tr>
+      <tr><td>ACL <span class="lang-zh">在 list 与 call 两处一致</span><span class="lang-en">consistent across list &amp; call</span></td><td><code>impl_registry.rs::allows_caller</code> <span class="lang-zh">复用</span><span class="lang-en">reuse</span></td><td><code>registry_acl.rs</code></td></tr>
+      <tr><td><span class="lang-zh">四步检查 + 分流</span><span class="lang-en">Four-step checks + dispatch</span></td><td><code>impl_registry.rs::call_tool</code></td><td><code>registry_acl.rs</code></td></tr>
+      <tr><td><span class="lang-zh">指数退避</span><span class="lang-en">Exponential backoff</span> 1/2/4/8/…/30s</td><td><code>restart.rs::BackoffPolicy</code></td><td><span class="lang-zh">单测</span><span class="lang-en">unit test</span></td></tr>
+      <tr><td>5 <span class="lang-zh">分钟窗口</span><span class="lang-en">min window</span> &gt; 5 <span class="lang-zh">次</span><span class="lang-en">fails</span> → CircuitOpen</td><td><code>restart.rs::CircuitBreaker</code></td><td><span class="lang-zh">单测 + 集成</span><span class="lang-en">unit + integration</span></td></tr>
+      <tr><td><span class="lang-zh">重启流程 5 步</span><span class="lang-en">5-step restart flow</span></td><td><code>restart.rs::rebuild</code></td><td><code>restart_manager.rs</code></td></tr>
+      <tr><td><span class="lang-zh">重启失败 → Failed 不再重试</span><span class="lang-en">Restart failure → Failed, no retry</span></td><td><code>restart.rs::give_up</code></td><td><code>restart_manager.rs</code></td></tr>
+      <tr><td><span class="lang-zh">重启期间 available=false + 立即报错不排队</span><span class="lang-en">available=false during restart + immediate error, no queue</span></td><td><code>note_availability</code> + <code>call_tool</code></td><td><code>restart_manager.rs</code></td></tr>
+      <tr><td><span class="lang-zh">包整体签名覆盖清单+代码</span><span class="lang-en">Whole-package signature covers manifest + code</span></td><td><code>signature/mod.rs::digest</code></td><td><code>signature_downgrade.rs</code></td></tr>
+      <tr><td><span class="lang-zh">吊销列表自身签名</span><span class="lang-en">Revocation list is self-signed</span></td><td><code>signature/revocation.rs</code></td><td><code>signature_downgrade.rs</code></td></tr>
+      <tr><td><span class="lang-zh">三个校验时机（加载/重启/热重载）</span><span class="lang-en">Three verification points (load/restart/hot-reload)</span></td><td><code>loader.rs</code> + <code>restart.rs</code></td><td>—</td></tr>
+      <tr><td>MCP tools/list <span class="lang-zh">五字段</span><span class="lang-en">five fields</span></td><td><code>mcp.rs</code></td><td><code>mcp_semantics.rs</code></td></tr>
+      <tr><td>MCP tools/call <code>{content,structuredContent,isError}</code></td><td><code>mcp.rs</code></td><td><code>mcp_semantics.rs</code></td></tr>
+      <tr><td><span class="lang-zh">崩溃与业务错误协议同构</span><span class="lang-en">Crash &amp; business errors protocol-isomorphic</span></td><td><code>types.rs::ToolResult::error</code></td><td><code>mcp_semantics.rs</code></td></tr>
+      <tr><td>10 <span class="lang-zh">个错误码</span><span class="lang-en">error codes</span></td><td><code>error.rs::ToolErrorCode</code></td><td><span class="lang-zh">各测试按码断言</span><span class="lang-en">asserted by code in tests</span></td></tr>
+      <tr><td><span class="lang-zh">所有接口异步化</span><span class="lang-en">All interfaces async</span></td><td><span class="lang-zh">全部返回</span><span class="lang-en">all return</span> <code>impl Future</code> / <code>BoxFuture</code></td><td>—</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    <p>
+      Aether Launcher Docs ·
+      <span class="lang-zh">单文件构建（纯 HTML/CSS/JS，无任何前端框架）。</span>
+      <span class="lang-en">single-file build (pure HTML/CSS/JS, no frontend framework).</span><br>
+      <span class="lang-zh">深入文档：</span><span class="lang-en">In-depth docs:</span>
+      <a href="docs/architecture.md">architecture.md</a> ·
+      <a href="docs/security-boundary.md">security-boundary.md</a> ·
+      <a href="docs/open-questions.md">open-questions.md</a> ·
+      <a href="README.md">README.md</a>
+    </p>
+  </footer>
+
+</div>
+</main>
+
+<script>
+/* ============================================================
+   主题 / 语言 Cookie 持久化 + 复制按钮 + 滚动高亮 + 语法着色
+   ============================================================ */
+(function () {
+  "use strict";
+
+  /* ---------- Cookie 工具 ---------- */
+  function setCookie(key, val) {
+    // 偏好持久化一年，路径限定本应用，SameSite=Lax
+    document.cookie = key + "=" + val + "; path=/; max-age=31536000; SameSite=Lax";
+  }
+  function getCookie(key) {
+    var row = document.cookie.split("; ").find(function (r) { return r.indexOf(key + "=") === 0; });
+    return row ? row.split("=")[1] : null;
+  }
+
+  /* ---------- 主题 ---------- */
+  var themeBtn = document.getElementById("themeBtn");
+  var themeIcon = document.getElementById("themeIcon");
+  function applyTheme(t) {
+    document.documentElement.dataset.theme = t;
+    themeIcon.textContent = t === "dark" ? "☀️" : "🌙"; // 图标提示「点击后变成的样子」
+    setCookie("aether_docs_theme", t);
+  }
+  themeBtn.addEventListener("click", function () {
+    applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
+
+  /* ---------- 语言 ---------- */
+  var langBtn = document.getElementById("langBtn");
+  var langLabel = document.getElementById("langLabel");
+  function applyLang(l) {
+    document.documentElement.dataset.lang = l;
+    document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
+    langLabel.textContent = l === "zh" ? "中 / EN" : "EN / 中";
+    setCookie("aether_docs_lang", l);
+  }
+  langBtn.addEventListener("click", function () {
+    applyLang(document.documentElement.dataset.lang === "zh" ? "en" : "zh");
+  });
+
+  /* ---------- window.onload：读取 Cookie 恢复偏好（无缝记忆） ---------- */
+  window.addEventListener("load", function () {
+    var t = getCookie("aether_docs_theme");
+    if (t === "dark" || t === "light") applyTheme(t); else applyTheme("dark");
+    var l = getCookie("aether_docs_lang");
+    if (l === "zh" || l === "en") applyLang(l); else applyLang("zh");
+  });
+
+  /* ---------- 移动端侧栏 ---------- */
+  var sidebar = document.getElementById("sidebar");
+  document.getElementById("menuBtn").addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+  });
+  sidebar.addEventListener("click", function (e) {
+    if (e.target.closest("a")) sidebar.classList.remove("open");
+  });
+
+  /* ---------- 轻量语法着色（一次 pass 的正则 tokenizer） ---------- */
+  var KEYWORDS = new Set(("fn let mut pub use struct enum impl match if else return async await move const static " +
+    "crate self Self where for in loop while as dyn mod trait type ref unsafe true false " +
+    "function var import export from new null undefined").split(" "));
+  var TOKEN = new RegExp(
+    [
+      "(\\/\\/[^\\n]*|#[^\\n]*)",                        // 1 注释
+      "(\"(?:[^\"\\\\\\n]|\\\\.)*\")",                   // 2 字符串
+      "(\\b\\d[\\d_]*(?:\\.\\d+)?(?:_ms|_s|_kb|_us)?\\b)", // 3 数字
+      "([A-Za-z_$][\\w$]*)",                             // 4 词
+      "([{}()\\[\\];,.:=<>+\\-*/!&|?@]+)"                // 5 标点
+    ].join("|"),
+    "g"
+  );
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function highlight(code) {
+    var out = "", last = 0, m;
+    TOKEN.lastIndex = 0;
+    while ((m = TOKEN.exec(code)) !== null) {
+      out += esc(code.slice(last, m.index));
+      last = m.index + m[0].length;
+      if (m[1])      out += '<span class="tok-c">' + esc(m[1]) + "</span>";
+      else if (m[2]) out += '<span class="tok-s">' + esc(m[2]) + "</span>";
+      else if (m[3]) out += '<span class="tok-n">' + esc(m[3]) + "</span>";
+      else if (m[4]) {
+        var w = m[4], rest = code.slice(last);
+        if (KEYWORDS.has(w))            out += '<span class="tok-k">' + esc(w) + "</span>";
+        else if (/^[A-Z]/.test(w))      out += '<span class="tok-t">' + esc(w) + "</span>";
+        else if (/^\s*\(/.test(rest) || /^\s*:/.test(rest))
+                                        out += '<span class="tok-f">' + esc(w) + "</span>";
+        else                            out += esc(w);
+      }
+      else           out += esc(m[5]);
+    }
+    return out + esc(code.slice(last));
+  }
+  document.querySelectorAll(".codeblock pre").forEach(function (pre) {
+    pre.innerHTML = highlight(pre.textContent);
+  });
+
+  /* ---------- 复制按钮 ---------- */
+  document.querySelectorAll(".cb-copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var pre = btn.closest(".codeblock").querySelector("pre");
+      var text = pre.textContent;
+      function done(ok) {
+        btn.textContent = ok ? "Copied ✓" : "Failed";
+        btn.classList.toggle("ok", ok);
+        setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("ok"); }, 1400);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); },
+                                                 function () { done(false); });
+      } else {
+        // file:// 下的兜底
+        var ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta); done(ok);
+      }
+    });
+  });
+
+  /* ---------- 滚动监听：侧栏当前章节高亮 ---------- */
+  var spyLinks = {};
+  document.querySelectorAll("[data-spy]").forEach(function (a) {
+    spyLinks[a.getAttribute("data-spy")] = a;
+  });
+  function setActive(id) {
+    Object.keys(spyLinks).forEach(function (k) { spyLinks[k].classList.remove("active"); });
+    var link = spyLinks[id];
+    if (link) {
+      link.classList.add("active");
+      // 父级章节同步点亮
+      var section = link.closest(".nav-group").querySelector(":scope > a");
+      if (section && section !== link) section.classList.add("active");
+    }
+  }
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) setActive(en.target.id);
+      });
+    }, { rootMargin: "-80px 0px -65% 0px", threshold: 0 });
+    document.querySelectorAll("h3[id], h2[id]").forEach(function (h) { io.observe(h); });
+  }
+
+  /* ---------- 锚点点击：为 fixed 顶栏预留滚动余量 ---------- */
+  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      var id = a.getAttribute("href").slice(1);
+      var target = document.getElementById(id);
+      if (target) {
+        e.preventDefault();
+        window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 76, behavior: "smooth" });
+        history.replaceState(null, "", "#" + id);
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
