@@ -21,15 +21,58 @@
 //! --window-radius <整数>   窗口圆角 0..64
 //! --no-anim                关闭过渡动画
 //! --light                  亮色主题
+//! --demo                   强制使用演示数据（不接入 official-* 插件）
 //! --shot <页面>            离屏渲染 instances/mods/launch 并导出截图
 //! --out <路径>             截图输出路径（默认 ui-<页面>.png）
 //! ```
 
+// Windows 发布版：不弹出命令行控制台窗口（GUI 子系统）。
+// 调试构建仍保留控制台，方便看日志；运行日志可在应用内"日志"页查看。
+#![cfg_attr(all(target_os = "windows", not(debug_assertions)), windows_subsystem = "windows")]
+
 #![forbid(unsafe_code)]
 
+use launcher_ui::live::LiveDataSource;
 use launcher_ui::App;
+use std::sync::Arc;
 use ui_core::backend::Backend;
 use ui_core::{FontConfig, GlassConfig, StyleConfig};
+
+/// 崩溃黑匣子：GUI 子系统下 panic 默认无处输出、程序静默消失。
+/// 把 panic 位置与调用栈追加到 `data/crash.log`（exe 旁边），供事后定位。
+fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let msg = format!(
+            "[{}] PANIC: {info}\nbacktrace:\n{:#?}\n----\n",
+            chrono_like_now(),
+            std::backtrace::Backtrace::force_capture()
+        );
+        let dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("data")))
+            .unwrap_or_else(std::env::temp_dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let log = dir.join("crash.log");
+        let tmp = dir.join("crash.log.new");
+        let _ = std::fs::write(&tmp, &msg);
+        // 追加而不是覆盖，保留历史崩溃记录。
+        if let Ok(old) = std::fs::read(&log) {
+            let mut merged = old;
+            merged.extend_from_slice(msg.as_bytes());
+            let _ = std::fs::write(&tmp, &merged);
+        }
+        let _ = std::fs::rename(&tmp, &log);
+    }));
+}
+
+/// 本地时间字符串（不引入 chrono，用 SystemTime 算 UTC 即可）。
+fn chrono_like_now() -> String {
+    let d = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("epoch={d}")
+}
 
 /// 读取 `--key value` 形式的值。
 fn arg_value(args: &[String], key: &str) -> Option<String> {
@@ -91,14 +134,36 @@ fn render_soft_frame(
     width: i32,
     height: i32,
     out_png: &str,
+    click: Option<(i32, i32)>,
 ) -> (i32, i32, usize, usize) {
     use ui_backend_soft::SoftBackend;
     let be = SoftBackend::new(width, height).with_backdrop(0xFF0E_0E12);
     let theme = app.theme().clone();
     // 离屏渲染：dt = 0（不推进动画时间，保证截图稳定）。
+    // 先把页面进入动画置为完成，否则内容区会被裁成 0 宽（见 App::freeze_page_animation）。
+    app.freeze_page_animation();
     let mut state = ui_core::FrameState::new();
+    // 模拟点击：把移动 / 按下 / 抬起注入同一帧，控件按常规命中测试处理。
+    let events: Vec<ui_core::Event> = match click {
+        Some((x, y)) => vec![
+            ui_core::Event::MouseMove { x, y },
+            ui_core::Event::MouseDown {
+                x,
+                y,
+                button: ui_core::MouseButton::Left,
+                mods: ui_core::Modifiers::default(),
+            },
+            ui_core::Event::MouseUp {
+                x,
+                y,
+                button: ui_core::MouseButton::Left,
+                mods: ui_core::Modifiers::default(),
+            },
+        ],
+        None => Vec::new(),
+    };
     let list = {
-        let mut ui = ui_core::Ui::begin_frame(&be, &theme, Vec::new(), &mut state, 0.0);
+        let mut ui = ui_core::Ui::begin_frame(&be, &theme, events, &mut state, 0.0);
         app.render(&mut ui);
         ui.finish()
     };
@@ -124,13 +189,25 @@ fn page_from_args(args: &[String]) -> launcher_ui::app::Page {
     launcher_ui::app::Page::from_arg(&name)
 }
 
-/// 用户配置路径。首次运行不存在时，`App::enable_persistence` 会进入引导。
-fn config_path() -> std::path::PathBuf {
+/// 默认数据根目录：%APPDATA%\WorkBuddyLauncher。
+fn default_data_root() -> std::path::PathBuf {
     std::env::var_os("APPDATA")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("WorkBuddyLauncher")
-        .join("config.json")
+}
+
+/// 探测目录是否真的可写（写一个探针文件并删除）。
+fn dir_writable(dir: &std::path::Path) -> bool {
+    let _ = std::fs::create_dir_all(dir);
+    let probe = dir.join(".write_probe.tmp");
+    match std::fs::write(&probe, b"probe") {
+        Ok(()) => {
+            let _ = std::fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +297,7 @@ fn png_from_pixels(w: i32, h: i32, pixels: &[u32]) -> Vec<u8> {
 
 #[cfg(target_os = "windows")]
 fn main() {
+    install_panic_hook();
     let args: Vec<String> = std::env::args().collect();
     let force_soft = args.iter().any(|a| a == "--soft");
     let win_selftest = args.iter().any(|a| a == "--win-selftest");
@@ -239,23 +317,86 @@ fn main() {
         app.set_page(page);
         let out =
             arg_value(&args, "--out").unwrap_or_else(|| format!("ui-{}.png", page_name(page)));
-        let (w, h, ops, bytes) = render_soft_frame(&mut app, 1100, 720, &out);
-        println!(
-            "软件后端渲染完成（{}）：{w}x{h}，{ops} 条绘制指令，PNG {bytes} 字节 → {out}",
-            page_name(page)
-        );
+        // --click x,y：先截「点击前」，再注入合成点击事件渲染「点击后」。
+        let click = arg_value(&args, "--click").and_then(|s| {
+            let (a, b) = s.split_once(',')?;
+            Some((a.trim().parse::<i32>().ok()?, b.trim().parse::<i32>().ok()?))
+        });
+        match click {
+            Some((x, y)) => {
+                let (w, h, ops, bytes) = render_soft_frame(&mut app, 1100, 720, &out, None);
+                println!(
+                    "点击前（{}）：{w}x{h}，{ops} 条绘制指令，PNG {bytes} 字节 → {out}",
+                    page_name(page)
+                );
+                // 点击帧：消费合成点击事件（页面跳转在帧末应用）。
+                app.freeze_page_animation();
+                let _ = render_soft_frame(&mut app, 1100, 720, &out, Some((x, y)));
+                // 点击后帧：新页面已生效，再冻结一次进入动画后截图。
+                app.freeze_page_animation();
+                let after = out.replace(".png", "-after-click.png");
+                let (w, h, ops, bytes) = render_soft_frame(&mut app, 1100, 720, &after, None);
+                println!(
+                    "模拟点击 ({x},{y}) 后（{}）：{w}x{h}，{ops} 条绘制指令，PNG {bytes} 字节 → {after}",
+                    page_name(app.page())
+                );
+            }
+            None => {
+                let (w, h, ops, bytes) = render_soft_frame(&mut app, 1100, 720, &out, None);
+                println!(
+                    "软件后端渲染完成（{}）：{w}x{h}，{ops} 条绘制指令，PNG {bytes} 字节 → {out}",
+                    page_name(page)
+                );
+            }
+        }
         return;
     }
 
-    // 真实窗口才启用持久化：离屏截图 / 窗口自检不应写用户配置。
+    // 真实窗口才启用持久化与实时数据源：离屏截图 / 窗口自检不应写用户配置。
     if !win_selftest {
-        app.enable_persistence(config_path());
+        // 选择数据根：默认 %APPDATA%\WorkBuddyLauncher；若被杀软/系统拦截写不进去，
+        // 自动切换到便携模式（exe 旁边的 data 目录），保证存储永远可用。
+        let mut root = default_data_root();
+        let mut portable = false;
+        if !dir_writable(&root) {
+            let alt = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("data")))
+                .unwrap_or_else(|| std::path::PathBuf::from("data"));
+            if dir_writable(&alt) {
+                root = alt;
+                portable = true;
+            }
+        }
+        app.enable_persistence(root.join("config.json"));
+        // 默认接入真实插件（official-*）；加 `--demo` 保留纯内存演示数据。
+        if !args.iter().any(|a| a == "--demo") {
+            let plugins_dir = root.join("plugins");
+            if portable {
+                let msg = format!(
+                    "[WARN] AppData 数据目录不可写（疑似杀毒软件/防勒索防护拦截），已切换便携模式：{}\n\
+                     [WARN] 把 AetherLauncher.exe 加入杀毒软件白名单后，可删除 data 目录恢复默认位置。",
+                    root.display()
+                );
+                eprintln!("{msg}");
+                app.model_mut().log(msg);
+            }
+            match LiveDataSource::new(plugins_dir.clone()) {
+                Ok(src) => {
+                    app.model_mut().attach_live(Arc::new(src));
+                    app.model_mut().refresh();
+                }
+                Err(e) => eprintln!("LiveDataSource 初始化失败，回退演示模式：{e}"),
+            }
+            // 声明式页面插件 + 外接 MCP：铺示例、热加载目录就绪。
+            app.model_mut().enable_page_plugins(&root);
+        }
     }
 
-    let Some(backend) = ui_backend_win32::Win32Backend::create("Minecraft 启动器", 1100, 720)
+    let Some(backend) = ui_backend_win32::Win32Backend::create("Aether Launcher", 1100, 720)
     else {
         eprintln!("创建窗口失败，回退到软件渲染");
-        let (w, h, ops, bytes) = render_soft_frame(&mut app, 1100, 720, "ui-soft-render.png");
+        let (w, h, ops, bytes) = render_soft_frame(&mut app, 1100, 720, "ui-soft-render.png", None);
         println!("{w}x{h}，{ops} 条指令，PNG {bytes} 字节");
         return;
     };

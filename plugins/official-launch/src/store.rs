@@ -49,6 +49,40 @@ pub struct LaunchConfig {
     pub game_args: Vec<String>,
     /// 最大堆内存（MB）。
     pub memory_mb: u32,
+    /// Java 可执行文件绝对路径。`None` 时回退到 `java`（依赖 PATH）。
+    #[serde(default)]
+    pub java_path: Option<String>,
+    /// 游戏本体的标准参数（由 `install_minecraft` 写入：--gameDir/--assetsDir 等）。
+    /// 与用户自定义的 `game_args` 分开存，避免设置启动参数时被覆盖丢失。
+    #[serde(default)]
+    pub mc_args: Vec<String>,
+    /// 启动入口：决定 `java [jvm_args]` 之后追加什么参数。
+    /// 默认 `None` 表示"探测式启动"（`java -version`），只用来验证真实进程确实能被 spawn。
+    #[serde(default)]
+    pub entry: LaunchEntry,
+    /// natives 解压目录（`install_minecraft` 写入：LWJGL/JNA 的 Windows DLL 都在这里）。
+    /// 启动时转成 `-Djava.library.path` / `-Dorg.lwjgl.librarypath` JVM 参数。
+    #[serde(default)]
+    pub natives_dir: Option<String>,
+}
+
+/// 启动入口：决定 `java [jvm_args]` 之后追加什么。
+///
+/// 默认 `None` 只做一次真实的 `java -version` 探测（返回真实 PID、立即 exit 0），
+/// 证明"真实 spawn Java 进程"这条路已打通。要真正进游戏，请把入口配成
+/// [`LaunchEntry::Jar`] 或 [`LaunchEntry::MainClass`]，指向真实的客户端 jar / 主类。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(tag = "type", content = "value")]
+pub enum LaunchEntry {
+    /// 未配置：启动器用 `java -version` 做一次真实但无害的探测启动。
+    #[default]
+    None,
+    /// 运行一个 jar：`java [args] -jar <path>`。
+    Jar(String),
+    /// 运行主类：`java [args] -cp <classpath> <class>`。
+    MainClass { class: String, classpath: String },
+    /// 原始参数：直接追加到 `java [jvm_args]` 之后（game_args 也会追加）。
+    Raw(Vec<String>),
 }
 
 impl Default for LaunchConfig {
@@ -56,7 +90,11 @@ impl Default for LaunchConfig {
         Self {
             jvm_args: vec!["-XX:+UseG1GC".to_owned()],
             game_args: Vec::new(),
+            mc_args: Vec::new(),
             memory_mb: DEFAULT_MEMORY_MB,
+            java_path: None,
+            entry: LaunchEntry::None,
+            natives_dir: None,
         }
     }
 }
@@ -112,14 +150,161 @@ impl LaunchIndex {
     }
 
     pub fn save(&self, store: &LaunchStore) -> Result<(), StoreError> {
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| StoreError::Io(e.to_string()))?;
-        }
-        let tmp = self.path.with_extension("json.tmp");
         let bytes = serde_json::to_vec_pretty(store).map_err(|e| StoreError::Io(e.to_string()))?;
-        std::fs::write(&tmp, &bytes).map_err(|e| StoreError::Io(e.to_string()))?;
-        std::fs::rename(&tmp, &self.path).map_err(|e| StoreError::Io(e.to_string()))?;
-        Ok(())
+        launcher_plugin_common::fsutil::atomic_write(&self.path, &bytes).map_err(StoreError::Io)
+    }
+}
+
+// ----------------------------------------------------------------------------
+// 当前已启动的游戏进程（进程级槽位）
+//
+// 真实 spawn 后需要持续持有 `Child` 句柄，以便在 UI 轮询真实退出码。
+// 这是单实例启动器的进程级状态，用一个 `static` 槽位持有即可。
+// ----------------------------------------------------------------------------
+
+static CURRENT_CHILD: std::sync::LazyLock<std::sync::Mutex<Option<std::process::Child>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+
+/// 把刚 spawn 的子进程存入槽位并返回其真实 PID。
+pub fn store_child(child: std::process::Child) -> u32 {
+    let pid = child.id();
+    *CURRENT_CHILD.lock().expect("child slot poisoned") = Some(child);
+    pid
+}
+
+// ----------------------------------------------------------------------------
+// 游戏进程输出环形缓冲
+//
+// Java 子进程的 stdout/stderr 由后台线程读取后写入这里；UI 每帧 `drain_game_log`
+// 取走增量，转发到启动器的日志管理器。容量上限防止内存无限增长。
+// ----------------------------------------------------------------------------
+
+static GAME_LOG: std::sync::LazyLock<std::sync::Mutex<std::collections::VecDeque<String>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::VecDeque::new()));
+
+const GAME_LOG_CAP: usize = 800;
+
+/// 追加一行游戏输出（超出容量丢弃最旧的）。
+pub fn push_game_log(line: String) {
+    let mut g = GAME_LOG.lock().expect("game log poisoned");
+    if g.len() >= GAME_LOG_CAP {
+        g.pop_front();
+    }
+    g.push_back(line);
+}
+
+/// 取走全部未读的游戏输出行。
+pub fn drain_game_log() -> Vec<String> {
+    let mut g = GAME_LOG.lock().expect("game log poisoned");
+    g.drain(..).collect()
+}
+
+/// 资源对象下载进度（含瞬时速度采样）。
+///
+/// `install_minecraft` 下载循环中持续更新；结束后置 `None`。
+/// UI 的 `tick` 每帧读取，转成下载中心里的任务进度。
+#[derive(Debug, Clone)]
+pub struct AssetProgress {
+    pub instance: String,
+    pub done: u64,
+    pub total: u64,
+    /// 瞬时速度（KB/s）：按 ≥500ms 时间窗对字节数差分采样得到。
+    /// 下载循环每完成一个文件都会 set 一次，不能每次都算（会抖动），窗口内沿用上次值。
+    pub speed_kb: u64,
+    /// 上次速度采样的字节数与时刻（差分基准）。
+    sample_done: u64,
+    sample_at: std::time::Instant,
+}
+
+/// 速度采样窗口：太短会跟着单个文件的字节跳变抖动，太长会迟钝。
+const SPEED_SAMPLE_MS: u128 = 500;
+
+static ASSET_PROGRESS: std::sync::LazyLock<std::sync::Mutex<Option<AssetProgress>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+
+pub fn set_asset_progress(instance: &str, done: u64, total: u64) {
+    let now = std::time::Instant::now();
+    let mut g = ASSET_PROGRESS.lock().expect("asset progress poisoned");
+    let replace = match g.as_mut() {
+        // 同一实例：更新进度，并按时间窗差分采样瞬时速度。
+        Some(p) if p.instance == instance => {
+            let dt = now.duration_since(p.sample_at);
+            if dt.as_millis() >= SPEED_SAMPLE_MS && done >= p.sample_done {
+                p.speed_kb = (done - p.sample_done)
+                    .saturating_mul(1000)
+                    / dt.as_millis().max(1) as u64
+                    / 1024;
+                p.sample_done = done;
+                p.sample_at = now;
+            }
+            p.done = done;
+            p.total = total;
+            false
+        }
+        // 首帧或实例切换：重建采样基准，速度归零（不跨实例串速度）。
+        _ => true,
+    };
+    if replace {
+        *g = Some(AssetProgress {
+            instance: instance.to_owned(),
+            done,
+            total,
+            speed_kb: 0,
+            sample_done: done,
+            sample_at: now,
+        });
+    }
+}
+
+pub fn clear_asset_progress() {
+    *ASSET_PROGRESS.lock().expect("asset progress poisoned") = None;
+}
+
+/// 当前进度：`(实例 id, 已完成字节, 总字节, 瞬时速度 KB/s)`。
+pub fn asset_progress() -> Option<(String, u64, u64, u64)> {
+    ASSET_PROGRESS
+        .lock()
+        .expect("asset progress poisoned")
+        .as_ref()
+        .map(|p| (p.instance.clone(), p.done, p.total, p.speed_kb))
+}
+
+/// 当前已启动进程的退出码（若已退出）；`None` 表示仍在运行或从未启动。
+pub fn launch_status() -> Option<i32> {
+    let mut g = CURRENT_CHILD.lock().expect("child slot poisoned");
+    match g.as_mut() {
+        Some(child) => match child.try_wait() {
+            Ok(Some(status)) => status.code(),
+            Ok(None) => None,
+            Err(_) => Some(-1),
+        },
+        None => None,
+    }
+}
+
+/// 当前已启动进程的真实 PID（若还在运行）。
+pub fn current_pid() -> Option<u32> {
+    CURRENT_CHILD
+        .lock()
+        .expect("child slot poisoned")
+        .as_ref()
+        .map(|c| c.id())
+}
+
+/// 尝试杀死当前已启动的游戏进程（取消启动 / 停止运行时用）。
+/// 返回是否真的存在一个被杀死的进程。
+pub fn kill_child() -> bool {
+    let mut g = CURRENT_CHILD.lock().expect("child slot poisoned");
+    if let Some(mut child) = g.take() {
+        match child.kill() {
+            Ok(()) => {
+                let _ = child.wait();
+                true
+            }
+            Err(_) => false,
+        }
+    } else {
+        false
     }
 }
 
@@ -348,6 +533,7 @@ mod tests {
                 jvm_args: vec!["-Xmx4G".into()],
                 game_args: vec!["--fullscreen".into()],
                 memory_mb: 4096,
+                ..Default::default()
             },
         );
         s.save(&store).unwrap();

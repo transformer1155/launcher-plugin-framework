@@ -9,6 +9,7 @@
 
 pub mod arg_parse;
 pub mod context;
+pub mod fsutil;
 pub mod json;
 pub mod manifest;
 pub mod registry;

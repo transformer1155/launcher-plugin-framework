@@ -1,6 +1,10 @@
 # Minecraft 启动器 · 单进程插件框架
 
-单 OS 进程、无子进程、无 HTTP / socket / 管道。插件间通信全部是宿主进程内的异步函数调用。
+单 OS 进程、插件之间无 HTTP / socket / 管道。插件间通信全部是宿主进程内的异步函数调用。
+
+> **唯一例外（有意为之）**：`official-launch` 在启动游戏时会 `spawn` 一个 Java 子进程。
+> 这个子进程是被启动的**产品本体**（Minecraft JVM），不是 IPC 通道 —— 框架不用它与插件通信，
+> 只是把它拉起来并轮询退出码。除此之外整条链路仍是单进程。
 
 > ⚠️ **先读 [`docs/security-boundary.md`](docs/security-boundary.md)**。
 > 这套架构**不是**安全沙箱：可信插件与宿主同等权限，沙箱插件只是逻辑隔离。
@@ -259,15 +263,14 @@ release 构建通过、`--win-selftest` 真实窗口渲染 8 帧并截图成功�
 
 ### 插件与网络层
 
-6. `launch_game` 返回 `pid: null` / `simulated: true`。要让游戏真跑起来必须打破「单进程、无子进程」前提，这是**架构级决策**。
+6. `launch_game` 现在**真实 spawn Java 子进程**并返回真实 `pid`（默认入口 `LaunchEntry::None` 执行一次无害的 `java -version` 探测；指向真实 jar / 主类即可真正进游戏）。UI 轮询真实退出码后收尾。演示模式（`--demo`）下仍是内存模拟。
 7. `install_mod` 仍写占位文件；真实 Mod 下载、sha1/sha512 校验、依赖解析**尚未实现**。
 8. `plugin.json` 里的 `signature` 字段目前**不会被解析**（serde 静默忽略），改它不影响信任级别。
 9. `host-http` 不做证书固定 / HTTP/2 / 连接池 / per-host 限流；`rustls-rustcrypto` 是 alpha 版。
 
 ### UI 层
 
-10. **UI 尚未接入插件工具**：`launcher-ui/Cargo.toml` 声明了框架与 `common` 依赖，但源码没有任何调用；
-    界面操作只写本地 `DataStore`。数据形状与真实返回一致，接入时换 `LiveDataSource` 即可。
+10. **UI 已接入插件工具**：`launcher-ui` 通过 `LiveDataSource` 直接调用 `official-instance` / `official-launch` / `official-mod` 的 handler（进程内 `tokio` 桥接）。默认接真实数据源，加 `--demo` 回退到纯内存演示数据。
 11. 在线 Mod 搜索未接网络（搜索框只做本地过滤）；外观设置不持久化；无边框窗口不能拖拽边缘缩放；高 DPI 仍是粗估。
 12. Win32 的 `BlurRegion` 是半透明 tint 近似；软件后端无 CJK 点阵（软件截图中文是方块，真实窗口正常）。
 

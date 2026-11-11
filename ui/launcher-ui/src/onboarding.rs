@@ -129,7 +129,7 @@ pub fn render(ui: &mut Ui<'_, impl Backend + ?Sized>, m: &mut LauncherModel, the
 fn welcome(ui: &mut Ui<'_, impl Backend + ?Sized>, _m: &mut LauncherModel, r: Rect, theme: &Theme) {
     ui.heading(
         Rect::new(r.x, r.y + 10, r.w, 40),
-        "欢迎使用 Minecraft 启动器",
+        "欢迎使用 Aether Launcher",
     );
     ui.text_vcenter(
         Rect::new(r.x, r.y + 58, r.w, 28),

@@ -24,9 +24,23 @@ fn frame_with(events: Vec<Event>) -> ui_core::DrawList {
     ui.finish()
 }
 
-// hover 现在是动画过渡（PCL 的 `AniStart` 范式）：状态改变的那一帧动画
-// 从"当前值"出发，所以必须在动画推进之后检查画面是否变化。参见下面的
-// `hover_animation_produces_intermediate_frame`，它用同一份跨帧 state 逐帧推进。
+/// 推进动画后的帧（dt > 0 让过渡真正走起来）。
+///
+/// # 为什么需要这个
+///
+/// hover 现在是**动画过渡**（PCL 的 `AniStart` 范式）：状态改变的那一帧，
+/// 动画从"当前值"开始，所以**第一帧的画面与之前完全相同**。
+///
+/// 这不是 bug，是动画的正常语义。但它意味着"hover 是否改变画面"必须在
+/// **动画推进之后**检查。
+fn frame_animated(events: Vec<Event>, dt: f32) -> ui_core::DrawList {
+    let be = ui_backend_soft::SoftBackend::new(200, 100);
+    let theme = Theme::dark();
+    let mut state = ui_core::FrameState::new();
+    let mut ui = Ui::begin_frame(&be, &theme, events, &mut state, dt);
+    ui.button(Rect::new(10, 10, 80, 30), "btn", ButtonKind::Normal, true);
+    ui.finish()
+}
 
 #[test]
 fn hover_changes_draw_content() {
@@ -102,7 +116,10 @@ fn hover_animation_produces_intermediate_frame() {
         !start.same_content(&mid),
         "动画推进后画面必须改变（否则过渡没生效）"
     );
-    assert!(!normal.same_content(&mid), "中间态应不同于普通态");
+    assert!(
+        !normal.same_content(&mid),
+        "中间态应不同于普通态"
+    );
 }
 
 #[test]
@@ -111,7 +128,10 @@ fn identical_input_yields_identical_content() {
     // 优化就完全失效了）。
     let a = frame_with(vec![Event::MouseMove { x: 50, y: 20 }]);
     let b = frame_with(vec![Event::MouseMove { x: 50, y: 20 }]);
-    assert!(a.same_content(&b), "相同输入必须产生相同绘制内容");
+    assert!(
+        a.same_content(&b),
+        "相同输入必须产生相同绘制内容"
+    );
 }
 
 #[test]

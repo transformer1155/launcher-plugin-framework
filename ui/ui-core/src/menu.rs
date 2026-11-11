@@ -26,6 +26,7 @@
 //! | 打开另一个菜单 | 换位置重开（而不是叠加） |
 
 use crate::event::{Event, MouseButton};
+use crate::id::WidgetId;
 use crate::layout::Rect;
 
 /// 菜单项。
@@ -312,9 +313,7 @@ mod tests {
         m.handle_events(&[Event::MouseDown {
             x: 10,
             y: 20,
-            button: MouseButton::Right,
-            mods: crate::id::Modifiers::default(),
-        }]);
+            button: MouseButton::Right, mods: crate::id::Modifiers::default(), }]);
         assert_eq!(m.right_down(), Some((10, 20)));
     }
 

@@ -66,10 +66,6 @@ pub enum Slot {
     ColorG,
     /// 颜色过渡的 B 通道。
     ColorB,
-    /// 浮层透明度（0..1），用于页面切换 / toast 淡入淡出。
-    Opacity,
-    /// 水平位移（逻辑像素），用于页面滑入。
-    TranslateX,
 }
 
 /// 颜色过渡用的三个通道槽位。
@@ -206,7 +202,13 @@ impl AnimationState {
     /// `dt_ms` 是距上一帧的毫秒数。
     ///
     /// 若该槽位没有动画，返回**上一次的值**（若从未有过则返回 `default`）。
-    pub fn value(&mut self, id: WidgetId, slot: Slot, dt_ms: f32, default: f32) -> f32 {
+    pub fn value(
+        &mut self,
+        id: WidgetId,
+        slot: Slot,
+        dt_ms: f32,
+        default: f32,
+    ) -> f32 {
         let key = (id, slot);
         // 先推进并算出值与目标值，再决定是否结束动画（避免同时持有两个可变借用）。
         let (v, finished, target) = match self.tracks.get_mut(&key) {
@@ -217,11 +219,7 @@ impl AnimationState {
                 let v = track.from + (track.to - track.from) * eased;
                 (v, t >= 1.0, track.to)
             }
-            None => (
-                self.values.get(&key).copied().unwrap_or(default),
-                false,
-                0.0,
-            ),
+            None => (self.values.get(&key).copied().unwrap_or(default), false, 0.0),
         };
         if finished {
             // 动画结束：落到目标值并移除轨道。
@@ -287,7 +285,13 @@ impl AnimationState {
     /// 读取颜色的某通道当前值（0..255），并推进时间。
     ///
     /// 首次读取时用 `default` 落盘，作为后续过渡的起点。
-    pub fn color_value(&mut self, id: WidgetId, ch: ColorChannel, dt_ms: f32, default: f32) -> f32 {
+    pub fn color_value(
+        &mut self,
+        id: WidgetId,
+        ch: ColorChannel,
+        dt_ms: f32,
+        default: f32,
+    ) -> f32 {
         let key = Self::color_key(id, ch);
         self.value(id, key.1, dt_ms, default)
     }
@@ -375,10 +379,7 @@ mod tests {
         let v = a.value(id(1), Slot::Scale, 100.0, 1.0);
         a.stop(id(1), Slot::Scale);
         let after = a.value(id(1), Slot::Scale, 1000.0, 1.0);
-        assert!(
-            (after - v).abs() < 0.001,
-            "打断后应冻结在当前值，实际 {after} vs {v}"
-        );
+        assert!((after - v).abs() < 0.001, "打断后应冻结在当前值，实际 {after} vs {v}");
     }
 
     #[test]

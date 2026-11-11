@@ -20,8 +20,13 @@
 pub mod app;
 pub mod data;
 pub mod domain;
+pub mod live;
+pub mod mcp;
 pub mod onboarding;
+pub mod page_plugin;
 pub mod pages;
+pub mod plugins_discovery;
+pub mod remote_plugin;
 pub mod shell;
 
 pub use app::App;

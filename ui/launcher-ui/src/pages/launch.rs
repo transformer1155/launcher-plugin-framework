@@ -1,21 +1,16 @@
-//! 启动设置页：可编辑表单 + 可点击内存条 + 真实日志。
+//! 启动设置页：JVM 参数 / 游戏参数 / 内存 / 启动按钮 / 日志。
 
 use ui_core::backend::Backend;
 use ui_core::layout::{EdgeInsets, Rect};
 use ui_core::widget::ButtonKind;
-use ui_core::{Ui, WidgetId};
+use ui_core::Ui;
 
 use crate::app::App;
 use crate::data::Snapshot;
 
-fn log_scroll_id() -> WidgetId {
-    WidgetId::derive(WidgetId::NONE, 7103, "launch-log")
-}
-
 pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect, snap: &Snapshot) {
     let theme = app.theme().clone();
     let gap = theme.gap;
-    let radius = theme.style.radius();
 
     // ---- 标题 ----
     let header_h = theme.font_heading + 8;
@@ -25,6 +20,7 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
         theme.divider,
     );
 
+    // 当前实例名
     let inst_name = app
         .selected_view()
         .map(|i| i.name)
@@ -35,144 +31,132 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
         format!("当前实例：{inst_name}"),
     );
 
+    let cfg = snap.launch_config.clone();
     let mut form_y = y + 26;
-    let label_w = 120;
-    let field_x = area.x + label_w;
-    let field_w = (area.w - label_w - 280).max(140);
 
-    // ---- 内存（可编辑 + 可点击比例条）----
+    // ---- 内存 ----
     let row = Rect::new(area.x, form_y, area.w, theme.control_h);
-    ui.label(
-        Rect::new(row.x, row.y, label_w, row.h),
-        "内存上限(MB)",
+    ui.label(Rect::new(row.x, row.y, 120, row.h), "内存上限", false);
+    let mem_text = cfg
+        .as_ref()
+        .map(|c| format!("{} MB", c.memory_mb))
+        .unwrap_or_else(|| "—".to_owned());
+    let field = Rect::new(row.x + 120, row.y, 160, row.h);
+    ui.fill(field, theme.input_bg);
+    ui.stroke(field, theme.input_border, theme.border);
+    ui.text_vcenter(
+        field.shrink(EdgeInsets::symmetric(theme.pad_small, 0)),
+        mem_text,
+        theme.text,
+        theme.font_body,
+        TextAlign::Left,
         false,
     );
-    ui.text_input(
-        Rect::new(field_x, row.y, 160, row.h),
-        "launch_memory",
-        &mut app.form_memory,
-        "512..32768",
-    );
-    let bar = Rect::new(
-        field_x + 172,
-        row.y + row.h / 2 - 5,
-        (field_w - 180).max(80),
-        10,
-    );
-    let memory = app.form_memory.trim().parse::<u32>().unwrap_or(4096);
-    let frac = memory_fraction(memory);
-    // 先命中测试，再画进度条（否则 hover 底纹会盖住进度条）。
-    let hit = ui.nav_item(bar, "", false);
-    if hit.clicked {
-        if let Some((mx, _)) = ui.mouse_pos() {
-            let f = ((mx - bar.x) as f32 / bar.w.max(1) as f32).clamp(0.0, 1.0);
-            let mb = ((f * 32768.0) as u32).clamp(512, 32768);
-            app.form_memory = mb.to_string();
-        }
-    }
+    // 内存条（可视化比例：假定上限 32768）
+    let bar = Rect::new(field.right() + gap, row.y + row.h / 2 - 4, 260, 8);
+    let frac = cfg
+        .as_ref()
+        .map(|c| (c.memory_mb as f32) / 32768.0)
+        .unwrap_or(0.0);
     ui.progress(bar, frac);
     form_y += theme.control_h + gap;
 
-    // ---- JVM 参数（可编辑）----
+    // ---- JVM 参数 ----
     let row = Rect::new(area.x, form_y, area.w, theme.control_h);
-    ui.label(Rect::new(row.x, row.y, label_w, row.h), "JVM 参数", false);
-    ui.text_input(
-        Rect::new(field_x, row.y, (row.w - label_w).max(120), row.h),
-        "launch_jvm",
-        &mut app.form_jvm,
-        "例如 -XX:+UseG1GC -Xmx6G",
+    ui.label(Rect::new(row.x, row.y, 120, row.h), "JVM 参数", false);
+    let jvm = cfg
+        .as_ref()
+        .map(|c| c.jvm_args.join("  "))
+        .unwrap_or_else(|| "—".to_owned());
+    let field = Rect::new(row.x + 120, row.y, (row.w - 130).max(0), row.h);
+    ui.fill(field, theme.input_bg);
+    ui.stroke(field, theme.input_border, theme.border);
+    ui.text_vcenter(
+        field.shrink(EdgeInsets::symmetric(theme.pad_small, 0)),
+        jvm,
+        theme.text_dim,
+        theme.font_small,
+        TextAlign::Left,
+        false,
     );
     form_y += theme.control_h + gap;
 
-    // ---- 游戏参数（可编辑）----
+    // ---- 游戏参数 ----
     let row = Rect::new(area.x, form_y, area.w, theme.control_h);
-    ui.label(Rect::new(row.x, row.y, label_w, row.h), "游戏参数", false);
-    ui.text_input(
-        Rect::new(field_x, row.y, (row.w - label_w).max(120), row.h),
-        "launch_game_args",
-        &mut app.form_game,
-        "例如 --fullscreen",
+    ui.label(Rect::new(row.x, row.y, 120, row.h), "游戏参数", false);
+    let game_args = cfg
+        .as_ref()
+        .map(|c| {
+            if c.game_args.is_empty() {
+                "（无）".to_owned()
+            } else {
+                c.game_args.join("  ")
+            }
+        })
+        .unwrap_or_else(|| "—".to_owned());
+    let field = Rect::new(row.x + 120, row.y, (row.w - 130).max(0), row.h);
+    ui.fill(field, theme.input_bg);
+    ui.stroke(field, theme.input_border, theme.border);
+    ui.text_vcenter(
+        field.shrink(EdgeInsets::symmetric(theme.pad_small, 0)),
+        game_args,
+        theme.text_dim,
+        theme.font_small,
+        TextAlign::Left,
+        false,
     );
     form_y += theme.control_h + gap + gap;
 
     // ---- 按钮行 ----
     let btn_row = Rect::new(area.x, form_y, area.w, theme.control_h);
-    let buttons = [
+    let lots = [
         ("保存配置", ButtonKind::Normal, 110),
         ("启动游戏", ButtonKind::Primary, 110),
         ("查看日志", ButtonKind::Normal, 110),
     ];
     let mut x = btn_row.x;
-    let mut action: Option<&str> = None;
-    for (label, kind, w) in buttons {
-        if ui
-            .button(Rect::new(x, btn_row.y, w, btn_row.h), label, kind, true)
-            .clicked
-        {
-            action = Some(label);
+    for (label, kind, w) in lots {
+        let r = Rect::new(x, btn_row.y, w, btn_row.h);
+        let resp = ui.button(r, label, kind, cfg.is_some());
+        if resp.clicked {
+            match label {
+                "保存配置" => app.toast("将调用 set_launch_config", false),
+                "启动游戏" => {
+                    app.toast("launch_game 返回 pid=null（模拟启动，未创建进程）", false)
+                }
+                _ => app.toast("将调用 get_last_log", false),
+            }
         }
         x += w + gap;
     }
-    match action {
-        Some("保存配置") => match app.save_launch_config() {
-            Ok(()) => app.toast("启动配置已保存", false),
-            Err(e) => app.toast(e, true),
-        },
-        Some("启动游戏") => {
-            // 模拟启动：不创建任何 OS 进程（框架约束），但日志真的会变。
-            let name = app
-                .selected_view()
-                .map(|i| i.name)
-                .unwrap_or_else(|| "未选择实例".to_owned());
-            app.store()
-                .push_log(format!("[INFO] 启动实例「{name}」（simulated）"));
-            app.store().push_log("[INFO] pid=null：未创建任何 OS 进程");
-            app.toast("模拟启动完成：未创建进程，已写入日志", false);
-        }
-        Some("查看日志") => {
-            app.log_expanded = !app.log_expanded;
-        }
-        _ => {}
-    }
 
     // ---- 日志区 ----
-    let log_top = form_y + theme.control_h + gap;
+    let log_top = form_y + theme.control_h + gap * 2;
     let log_area = Rect::new(area.x, log_top, area.w, (area.bottom() - log_top).max(0));
     if log_area.h > 60 {
-        ui.fill_round(log_area, theme.input_bg, radius);
-        ui.stroke_round(log_area, theme.input_border, radius, 1);
+        ui.fill(log_area, theme.input_bg);
+        ui.stroke(log_area, theme.input_border, theme.border);
         let inner = log_area.shrink(EdgeInsets::all(theme.pad_small));
-        ui.caption(
-            inner.take_top(18),
-            format!(
-                "最近日志（{} 行，滚轮可滚动）{}",
-                snap.log_lines.len(),
-                if app.log_expanded { " · 全部" } else { "" }
-            ),
-        );
-        let lines: Vec<&String> = if app.log_expanded {
-            snap.log_lines.iter().collect()
-        } else {
-            snap.log_lines.iter().rev().take(6).collect()
-        };
-        let line_h = 16;
-        let body = Rect::new(inner.x, inner.y + 20, inner.w, (inner.h - 20).max(0));
-        let content_h = lines.len() as i32 * line_h;
-        let offset = ui.scroll_area(log_scroll_id(), body, content_h);
-        ui.push_clip(body);
-        let mut ly = body.y - offset;
+        ui.caption(inner.take_top(18), "最近日志（模拟）");
+        let lines = [
+            "[10:00:00] [INFO] 加载实例配置",
+            "[10:00:01] [INFO] 解析 JVM 参数 2 项",
+            "[10:00:02] [WARN] memory_mb=6144 超过推荐值 4096",
+            "[10:00:03] [INFO] 启动（simulated）：未创建任何 OS 进程",
+        ];
+        let mut ly = inner.y + 20;
         for line in lines {
-            if ly + line_h > body.y && ly < body.bottom() {
-                ui.text(
-                    Rect::new(body.x, ly, body.w, line_h),
-                    line.clone(),
-                    theme.text_faint,
-                    theme.font_small,
-                );
+            if ly + 16 > inner.bottom() {
+                break;
             }
-            ly += line_h;
+            ui.text(
+                Rect::new(inner.x, ly, inner.w, 16),
+                line,
+                theme.text_faint,
+                theme.font_small,
+            );
+            ly += 16;
         }
-        ui.pop_clip();
     }
 }
 

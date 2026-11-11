@@ -32,6 +32,7 @@
 #![forbid(unsafe_code)]
 
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::collections::HashMap;
 
 use ui_core::backend::Backend;
@@ -55,6 +56,8 @@ pub struct SoftBackend {
     style: RefCell<StyleConfig>,
     /// 自定义点阵字形表（覆盖内置 5×7 字形）。
     custom_glyphs: RefCell<HashMap<char, [u8; 7]>>,
+    /// 剪贴板（软后端进程内模拟）。
+    clipboard: Rc<RefCell<String>>,
     /// 是否模拟"窗口圆角"。只有被 `Ui::begin_frame` 驱动时才开启，
     /// 直接调用 `present()` 做单元测试时保持方角（否则会遮掉测试像素）。
     round_window: RefCell<bool>,
@@ -75,8 +78,19 @@ impl SoftBackend {
             style: RefCell::new(StyleConfig::default()),
             custom_glyphs: RefCell::new(HashMap::new()),
             round_window: RefCell::new(false),
+            clipboard: std::rc::Rc::new(std::cell::RefCell::new(String::new())),
             backdrop: 0xFF0E_0E12,
         }
+    }
+
+    /// 读取进程内剪贴板（供测试断言 Ctrl+C 的结果）。
+    pub fn clipboard_text(&self) -> String {
+        self.clipboard.borrow().clone()
+    }
+
+    /// 预置进程内剪贴板（供测试模拟"外部复制了文本"再 Ctrl+V）。
+    pub fn set_clipboard_text(&self, s: &str) {
+        *self.clipboard.borrow_mut() = s.to_owned();
     }
 
     pub fn with_scale(mut self, scale: f32) -> Self {
@@ -627,6 +641,19 @@ impl Backend for SoftBackend {
             }
             *self.custom_glyphs.borrow_mut() = glyphs;
         }
+    }
+
+    fn clipboard_get(&self) -> Option<String> {
+        let s = self.clipboard.borrow();
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.clone())
+        }
+    }
+
+    fn clipboard_set(&self, text: &str) {
+        *self.clipboard.borrow_mut() = text.to_owned();
     }
 }
 

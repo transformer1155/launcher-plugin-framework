@@ -451,7 +451,13 @@ impl<'a, B: Backend + ?Sized> Ui<'a, B> {
         self.events.iter().any(|e| matches!(e, Event::TrayRestore))
     }
 
-    // ---------------------------------------------------------------
+    /// 本帧是否发生过"最小化进托盘"（系统级最小化被后端拦截时发出）。
+    pub fn tray_minimized_requested(&self) -> bool {
+        self.events
+            .iter()
+            .any(|e| matches!(e, Event::TrayMinimized))
+    }
+
     // 修饰键
     // ---------------------------------------------------------------
 
@@ -732,7 +738,8 @@ impl<'a, B: Backend + ?Sized> Ui<'a, B> {
 
     /// 圆角描边。
     pub fn stroke_round(&mut self, rect: Rect, color: Color, radius: i32, thickness: i32) {
-        self.draw.stroke_round_rect(rect, color, radius, thickness);
+        self.draw
+            .stroke_round_rect(rect, color, radius, thickness);
     }
 
     /// 磨玻璃后处理：模糊该区域已绘制的内容，再叠 tint。
@@ -1021,12 +1028,22 @@ impl<'a, B: Backend + ?Sized> Ui<'a, B> {
         self.focus.get() == Some(id)
     }
 
+    /// 请求焦点。**同时写焦点环与共享槽**：
+    ///
+    /// `finish()` 末尾有一处「环是权威」的单向同步——只要环里有焦点，就会把共享槽
+    /// 拉回环的值。若这里只写槽不写环（旧版输入框就是这么写的），那么「点过按钮之后
+    /// 再点输入框」的顺序下，帧末同步会把刚获得的焦点立刻拉回按钮，表现为
+    /// **输入框点了没反应、打字全无效**。两条焦点系统必须在这里同步。
     pub fn request_focus(&mut self, id: WidgetId) {
         self.focus.set(Some(id));
+        self.focus_ring.set_focus(Some(id));
     }
 
+    /// 清除焦点。与 [`Self::request_focus`] 同理，两条系统一起清：
+    /// 否则环里残留的旧焦点会在帧末把槽位又设回去，「点击外部失焦」失效。
     pub fn clear_focus(&mut self) {
         self.focus.set(None);
+        self.focus_ring.set_focus(None);
     }
 
     /// 取出本帧输入到某个输入框的编辑动作。
@@ -1072,6 +1089,62 @@ impl<'a, B: Backend + ?Sized> Ui<'a, B> {
                 _ => {}
             }
         }
+    }
+
+    // ---------------------------------------------------------------
+    // 控件桥接辅助（widget.rs 里访问不了私有字段，从这里过）
+    // ---------------------------------------------------------------
+
+    /// 当前控件所在父容器 ID（稳定 ID 派生用）。
+    pub(crate) fn current_parent(&self) -> WidgetId {
+        *self.parent_stack.last().unwrap_or(&WidgetId::NONE)
+    }
+
+    /// 本帧是否存在落在 `rect` 之外的左键按下（不关心是否已被其他控件消费）。
+    /// 输入框用它实现"点击外部失焦"。
+    pub(crate) fn left_mouse_down_outside(&self, rect: Rect) -> bool {
+        self.events.iter().any(|e| {
+            matches!(
+                e,
+                Event::MouseDown {
+                    x,
+                    y,
+                    button: MouseButton::Left,
+                    ..
+                } if !rect.contains(*x, *y)
+            )
+        })
+    }
+
+    /// 本帧的 Ctrl 快捷键字母（'C' / 'V' / 'X' …）。输入框剪贴板操作用。
+    pub(crate) fn shortcut_ctrl_keys(&self) -> Vec<char> {
+        self.events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Shortcut(crate::id::ShortcutKey::Ctrl(c)) => Some(*c),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// 读取剪贴板文本（转发给后端）。
+    pub(crate) fn clipboard_get(&self) -> Option<String> {
+        self.backend.clipboard_get()
+    }
+
+    /// 写剪贴板文本（转发给后端）。
+    pub(crate) fn clipboard_set(&self, text: &str) {
+        self.backend.clipboard_set(text);
+    }
+
+    /// 读取剪贴板文本（业务层公开入口，如插件工坊「从剪贴板导入」）。
+    pub fn clipboard_text(&self) -> Option<String> {
+        self.backend.clipboard_get()
+    }
+
+    /// 写剪贴板文本（业务层公开入口，如「复制模板到剪贴板」）。
+    pub fn set_clipboard_text(&self, text: &str) {
+        self.backend.clipboard_set(text);
     }
 
     // ---------------------------------------------------------------

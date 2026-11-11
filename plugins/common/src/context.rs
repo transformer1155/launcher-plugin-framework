@@ -114,6 +114,8 @@ impl PluginLogger for CapturingLogger {
 pub struct HttpReply {
     pub status: u16,
     pub body: Vec<u8>,
+    /// 最终 URL（跟随重定向后）。`None` 表示无重定向。
+    pub location: Option<String>,
 }
 
 /// 网络端口。**宿主必须实现**（框架层没有网络栈）。
@@ -430,6 +432,7 @@ mod tests {
                 Ok(HttpReply {
                     status: 200,
                     body: url.into_bytes(),
+                    location: None,
                 })
             })
         }

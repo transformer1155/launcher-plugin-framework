@@ -148,17 +148,25 @@ pub fn render(
         crate::domain::LauncherPhase::Idle => {
             let blockers = m.preflight();
             if blockers.is_empty() {
-                format!(
-                    "启动后：{}（simulated，不创建 OS 进程）",
-                    m.settings.after_launch.label()
-                )
+                if m.live.is_some() {
+                    format!("启动后：{}（真实启动 Java 进程）", m.settings.after_launch.label())
+                } else {
+                    format!(
+                        "启动后：{}（演示模式，不创建 OS 进程）",
+                        m.settings.after_launch.label()
+                    )
+                }
             } else {
                 format!("启动按钮已置灰：{}", blockers.join("；"))
             }
         }
         crate::domain::LauncherPhase::Launching => m.launch.detail.clone(),
         crate::domain::LauncherPhase::Running => {
-            "游戏运行中（simulated），可在此结束运行。".to_owned()
+            if m.live.is_some() {
+                "游戏运行中（真实进程），可在此结束运行。".to_owned()
+            } else {
+                "游戏运行中（演示），可在此结束运行。".to_owned()
+            }
         }
     };
     ui.text_vcenter(

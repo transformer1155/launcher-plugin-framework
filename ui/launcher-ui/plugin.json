@@ -1,0 +1,28 @@
+{
+  "id": "com.example.launcher-ui",
+  "name": "启动器界面",
+  "version": "0.1.0",
+  "author": "official",
+  "description": "启动器自身的界面插件：首页/版本/账户/下载/设置/日志/插件管理七个页面，即时模式 UI 与状态机都在这里",
+  "trust": "trusted",
+  "review": "official",
+  "min_framework_version": "0.1.0",
+  "tools": [
+    "page_home",
+    "page_versions",
+    "page_accounts",
+    "page_downloads",
+    "page_settings",
+    "page_logs",
+    "page_plugins"
+  ],
+  "tool_docs": {
+    "page_home": "首页仪表盘",
+    "page_versions": "版本管理页",
+    "page_accounts": "账户管理页",
+    "page_downloads": "下载中心页",
+    "page_settings": "设置页（含 Java 探测）",
+    "page_logs": "运行日志页",
+    "page_plugins": "插件管理页（发现 / 安装 / 卸载）"
+  }
+}

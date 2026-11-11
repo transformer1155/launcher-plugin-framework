@@ -78,29 +78,21 @@ pub fn render(
     // ---- 安装表单 ----
     let mut list_y = bar_y + theme.control_h + theme.gap;
     if m.open_version_detail.as_deref() == Some("__install__") {
-        let form = Rect::new(r.x, list_y, r.w, 118);
+        // 打开表单时加载官方版本目录（幂等，失败可重试）。
+        m.load_mc_catalog();
+        let form_h = 298;
+        let form = Rect::new(r.x, list_y, r.w, form_h);
         ui.fill_round(form, theme.panel, theme.radius);
         ui.text_input(
             Rect::new(form.x + theme.pad, form.y + 10, 260, theme.control_h_small),
             "new-version-name",
             &mut m.form_version_name,
-            "版本名称，如 1.20.1 Fabric",
-        );
-        ui.text_input(
-            Rect::new(
-                form.x + theme.pad + 268,
-                form.y + 10,
-                160,
-                theme.control_h_small,
-            ),
-            "new-mc-version",
-            &mut m.form_mc_version,
-            "游戏版本号",
+            "版本名称（留空自动生成）",
         );
         if ui
             .button(
                 Rect::new(
-                    form.x + theme.pad + 436,
+                    form.x + theme.pad + 268,
                     form.y + 10,
                     150,
                     theme.control_h_small,
@@ -119,16 +111,119 @@ pub fn render(
         }
         ui.caption(
             Rect::new(
-                form.x + theme.pad + 594,
+                form.x + theme.pad + 426,
                 form.y + 10,
-                260,
+                340,
                 theme.control_h_small,
             ),
-            "点击循环切换 Forge / Fabric / Quilt / NeoForge / OptiFine",
+            "加载器（当前真实下载仅支持原版）",
         );
+
+        // ---- 版本选择：搜索 + 点选（不再手输版本号）----
+        ui.caption(Rect::new(form.x + theme.pad, form.y + 46, 200, 22), "选择游戏版本");
+        ui.text_input(
+            Rect::new(form.x + theme.pad, form.y + 70, 260, theme.control_h_small),
+            "catalog-filter",
+            &mut m.catalog_filter,
+            "搜索版本，如 1.21",
+        );
+        let picked = Rect::new(
+            form.x + theme.pad + 268,
+            form.y + 70,
+            300,
+            theme.control_h_small,
+        );
+        ui.fill_round(picked, theme.card, theme.radius);
+        ui.text_vcenter(
+            picked,
+            format!("已选：{}", m.form_mc_version),
+            theme.accent,
+            theme.font_small,
+            TextAlign::Left,
+            true,
+        );
+
+        let list_rect = Rect::new(
+            form.x + theme.pad,
+            form.y + 106,
+            form.w - theme.pad * 2,
+            140,
+        );
+        match (&m.mc_catalog_state, m.mc_catalog.is_empty()) {
+            (Some(Err(e)), _) => {
+                if error_block(ui, list_rect, &format!("版本目录加载失败：{e}"), theme) {
+                    m.mc_catalog_state = None;
+                    m.load_mc_catalog();
+                }
+            }
+            (Some(Ok(true)), _) => {
+                loading_block(ui, list_rect, "正在拉取官方版本清单…", theme);
+            }
+            _ if m.mc_catalog.is_empty() => {
+                ui.caption(list_rect, "暂无版本目录，可直接确认安装（默认 1.21.1）");
+            }
+            _ => {
+                let f = m.catalog_filter.trim().to_ascii_lowercase();
+                let shown: Vec<_> = m
+                    .mc_catalog
+                    .iter()
+                    .filter(|(id, _, _)| f.is_empty() || id.contains(&f))
+                    .take(60)
+                    .cloned()
+                    .collect();
+                let row_h = 28;
+                let cid = WidgetId::derive(WidgetId::NONE, 1, "mc-catalog");
+                let off = ui.scroll_area(cid, list_rect, shown.len() as i32 * row_h);
+                ui.push_clip(list_rect);
+                for (i, (id, kind, rel)) in shown.iter().enumerate() {
+                    let row = Rect::new(
+                        list_rect.x,
+                        list_rect.y + i as i32 * row_h - off,
+                        list_rect.w,
+                        row_h - 4,
+                    );
+                    let selected = m.form_mc_version == *id;
+                    ui.fill_round(
+                        row,
+                        if selected { theme.row_selected } else { theme.card },
+                        theme.radius,
+                    );
+                    ui.text_vcenter(
+                        Rect::new(row.x + 10, row.y, 160, row.h),
+                        id.as_str(),
+                        if selected { theme.accent } else { theme.text },
+                        theme.font_small,
+                        TextAlign::Left,
+                        true,
+                    );
+                    ui.text_vcenter(
+                        Rect::new(row.x + 180, row.y, 220, row.h),
+                        rel.as_str(),
+                        theme.text_dim,
+                        theme.font_small,
+                        TextAlign::Left,
+                        false,
+                    );
+                    ui.text_vcenter(
+                        Rect::new(row.right() - 120, row.y, 110, row.h),
+                        kind.as_str(),
+                        theme.text_faint,
+                        theme.font_small,
+                        TextAlign::Right,
+                        false,
+                    );
+                    let rid = WidgetId::derive(cid, i as u32, "catalog-row");
+                    if ui.detect_click_pub(rid, row).1 {
+                        m.pick_mc_version(id);
+                    }
+                }
+                ui.pop_clip();
+            }
+        }
+
         if let Some(err) = m.form_error.clone() {
             ui.text_vcenter(
-                Rect::new(form.x + theme.pad, form.y + 48, form.w - 320, 22),
+                Rect::new(form.x + theme.pad, form.y + 254, form.w - 320, 22),
                 err,
                 theme.danger,
                 theme.font_small,
@@ -138,7 +233,7 @@ pub fn render(
         }
         if ui
             .button(
-                Rect::new(form.right() - 224, form.y + 48, 100, theme.control_h_small),
+                Rect::new(form.right() - 224, form.y + 254, 100, theme.control_h_small),
                 "取消",
                 ButtonKind::Normal,
                 true,
@@ -150,7 +245,7 @@ pub fn render(
         }
         if ui
             .button(
-                Rect::new(form.right() - 116, form.y + 48, 100, theme.control_h_small),
+                Rect::new(form.right() - 116, form.y + 254, 100, theme.control_h_small),
                 "确认安装",
                 ButtonKind::Primary,
                 true,
@@ -170,8 +265,8 @@ pub fn render(
             }
         }
         ui.caption(
-            Rect::new(form.x + theme.pad, form.y + 84, form.w - theme.pad * 2, 22),
-            "也可以直接把整合包或 .jar 拖到窗口上完成安装。",
+            Rect::new(form.x + theme.pad, form.y + 276, form.w - theme.pad * 2, 22),
+            "确认安装 = 创建实例 + 从 Mojang 官方源真实下载客户端（约 100MB，几分钟）。",
         );
         list_y = form.bottom() + theme.gap;
     }

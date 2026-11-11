@@ -315,11 +315,7 @@ impl std::fmt::Display for DrawOp {
                     rect.x, rect.y, rect.w, rect.h, color.0
                 )
             }
-            DrawOp::FillRoundRect {
-                rect,
-                color,
-                radius,
-            } => {
+            DrawOp::FillRoundRect { rect, color, radius } => {
                 write!(
                     f,
                     "FillRoundRect({},{},{},{} r={} #{:08X})",

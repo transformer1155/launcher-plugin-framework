@@ -12,15 +12,22 @@ ui-core = { path = "../ui-core" }
 ui-backend-soft = { path = "../ui-backend-soft" }
 launcher-plugin-common = { workspace = true }
 launcher-plugin-framework = { workspace = true }
+host-http = { path = "../../host-http" }
+official-instance = { workspace = true }
+official-launch = { workspace = true }
+official-mod = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true }
+# 远程插件安装：GitHub 归档是 tar.gz，解压用纯 Rust 栈（本机无 C 编译器）。
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+tar = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 ui-backend-win32 = { path = "../ui-backend-win32" }
 
 [dev-dependencies]
-tokio = { workspace = true }
 
 [[bin]]
-name = "launcher-ui"
+name = "AetherLauncher"
 path = "src/main.rs"

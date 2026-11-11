@@ -7,16 +7,42 @@
   "trust": "trusted",
   "review": "official",
   "min_framework_version": "0.1.0",
-  "tools": ["get_launch_config", "set_launch_config", "launch_game", "get_last_log"],
+  "tools": [
+    "get_launch_config",
+    "set_launch_config",
+    "launch_game",
+    "get_last_log",
+    "detect_java",
+    "download_java",
+    "install_minecraft",
+    "list_versions"
+  ],
   "tool_docs": {
     "get_launch_config": "读取实例的启动参数",
     "set_launch_config": "设置实例的启动参数",
-    "launch_game": "启动游戏（返回 simulated pid）",
-    "get_last_log": "读取实例的最近日志"
+    "launch_game": "启动游戏（真实 spawn Java 进程，返回真实 PID）",
+    "get_last_log": "读取实例的最近日志",
+    "detect_java": "扫描本机已安装的 Java 运行时",
+    "download_java": "从 Adoptium 下载 JDK（真实 HTTPS 下载 + tar 解压）",
+    "install_minecraft": "从 Mojang 官方源下载真实 Minecraft 客户端并配置启动入口",
+    "list_versions": "拉取 Mojang 官方可安装版本清单（供 UI 点选版本）"
   },
   "signature": {
     "algorithm": "ed25519",
     "key_id": "official-plugin-2026",
     "signature_hex": "PLACEHOLDER_TO_BE_REPLACED_BY_RELEASE_SIGNING"
+  },
+  "network": {
+    "allow_hosts": [
+      "api.adoptium.net",
+      "github.com",
+      "objects.githubusercontent.com",
+      "piston-meta.mojang.com",
+      "piston-data.mojang.com",
+      "launchermeta.mojang.com",
+      "libraries.minecraft.net",
+      "resources.download.minecraft.net"
+    ],
+    "reason": "download_java 从 Adoptium 下载 JDK；install_minecraft 从 Mojang 官方源下载 Minecraft 客户端、库与资源对象"
   }
 }

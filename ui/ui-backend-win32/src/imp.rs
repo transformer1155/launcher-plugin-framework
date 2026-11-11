@@ -198,6 +198,25 @@ extern "system" {
     fn DragFinish(hdrop: isize);
 }
 
+// 剪贴板（user32 + kernel32 堆内存）。
+#[link(name = "user32")]
+extern "system" {
+    fn OpenClipboard(owner: HWND) -> i32;
+    fn CloseClipboard() -> i32;
+    fn EmptyClipboard() -> i32;
+    fn SetClipboardData(format: u32, mem: isize) -> isize;
+    fn GetClipboardData(format: u32) -> isize;
+    fn IsClipboardFormatAvailable(format: u32) -> i32;
+}
+
+#[link(name = "kernel32")]
+extern "system" {
+    fn GlobalAlloc(flags: u32, bytes: usize) -> isize;
+    fn GlobalLock(mem: isize) -> *mut core::ffi::c_void;
+    fn GlobalUnlock(mem: isize) -> i32;
+    fn GlobalFree(mem: isize) -> isize;
+}
+
 /// `NOTIFYICONDATAW`（Win32 托盘图标结构，字段顺序与大小不可变）。
 #[repr(C)]
 struct NotifyIconDataW {
@@ -350,6 +369,10 @@ const WM_MOUSELEAVE: UINT = 0x02A3;
 const WM_DROPFILES: UINT = 0x0233;
 /// 托盘图标回调消息。
 const WM_TRAY: UINT = 0x8001;
+/// 系统菜单命令（任务栏右键"最小化"等）。
+const WM_SYSCOMMAND: UINT = 0x0112;
+/// 最小化命令（`WM_SYSCOMMAND` 的 `wParam`，低 4 位为系统内部使用需屏蔽）。
+const SC_MINIMIZE: WPARAM = 0xF020;
 /// 系统级拖动：把客户区按下伪装成"按在标题栏上"。
 const WM_NCLBUTTONDOWN: UINT = 0x00A1;
 const HTCAPTION: WPARAM = 2;
@@ -462,21 +485,38 @@ unsafe fn tray_icon_data(hwnd: HWND) -> NotifyIconDataW {
     d.u_flags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     d.u_callback_message = WM_TRAY;
     d.h_icon = LoadIconW(0, IDI_APPLICATION as *const u16);
-    let tip = wide("Minecraft 启动器");
+    let tip = wide("Aether Launcher");
     for (i, c) in tip.iter().take(127).enumerate() {
         d.sz_tip[i] = *c;
     }
     d
 }
 
-unsafe fn tray_add(hwnd: HWND) {
+unsafe fn tray_add(hwnd: HWND) -> bool {
     let mut d = tray_icon_data(hwnd);
-    Shell_NotifyIconW(NIM_ADD, &mut d);
+    // NIM_ADD 失败（如 explorer 刚重启、任务栏未就绪）时返回 false，
+    // 调用方应回退为普通最小化，绝不能把窗口藏起来又没有图标（否则找不回）。
+    Shell_NotifyIconW(NIM_ADD, &mut d) != 0
 }
 
 unsafe fn tray_delete(hwnd: HWND) {
     let mut d = tray_icon_data(hwnd);
     Shell_NotifyIconW(NIM_DELETE, &mut d);
+}
+
+/// 最小化 = 隐藏到系统托盘（本项目唯一的"最小化"语义）。
+///
+/// 托盘图标加成功才隐藏窗口；失败则回退为普通最小化（窗口进任务栏），
+/// 保证窗口始终可以从任务栏找回——绝不能藏起来又没有图标。
+/// 返回是否成功进了托盘。
+unsafe fn minimize_to_tray(hwnd: HWND) -> bool {
+    if tray_add(hwnd) {
+        ShowWindow(hwnd, SW_HIDE);
+        true
+    } else {
+        ShowWindow(hwnd, SW_MINIMIZE);
+        false
+    }
 }
 
 unsafe fn restore_window(hwnd: HWND) {
@@ -757,6 +797,18 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wp: WPARAM, lp: LPARAM) -> LR
             WM_CLOSE => {
                 DestroyWindow(hwnd); // WM_DESTROY → PostQuitMessage
                 0
+            }
+            // 任务栏右键"最小化"等系统级最小化：同样隐藏到托盘。必须拦截，
+            // 不交给 DefWindowProc（否则窗口只是普通最小化进任务栏）。
+            WM_SYSCOMMAND => {
+                if (wp & 0xFFF0) == SC_MINIMIZE {
+                    if minimize_to_tray(hwnd) {
+                        s.events.push(Event::TrayMinimized);
+                    }
+                    0
+                } else {
+                    DefWindowProcW(hwnd, msg, wp, lp)
+                }
             }
             WM_SIZE => {
                 let w = (lp & 0xFFFF) as i32;
@@ -1461,12 +1513,8 @@ pub fn perform_window_action(action: ui_core::WindowAction) {
                 ReleaseCapture();
                 SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
             }
-            A::Minimize => {
-                ShowWindow(hwnd, SW_MINIMIZE);
-            }
             A::MinimizeToTray => {
-                tray_add(hwnd);
-                ShowWindow(hwnd, SW_HIDE);
+                minimize_to_tray(hwnd);
             }
             A::Restore => {
                 restore_window(hwnd);
@@ -1479,6 +1527,10 @@ pub fn perform_window_action(action: ui_core::WindowAction) {
                 }
                 // 尺寸变了，圆角 region 要重建（最大化时内部会自动取消裁角）。
                 apply_window_effects(hwnd, &style);
+            }
+            A::Minimize => {
+                // 普通最小化（任务栏）。
+                ShowWindow(hwnd, SW_MINIMIZE);
             }
             A::Close => {
                 PostMessageW(hwnd, WM_CLOSE, 0, 0);
@@ -1618,6 +1670,74 @@ impl Backend for Win32Backend {
             if window_changed {
                 apply_window_effects(s.hwnd, &s.style);
             }
+        }
+    }
+
+    fn clipboard_get(&self) -> Option<String> {
+        const CF_UNICODETEXT: u32 = 13;
+        unsafe {
+            if IsClipboardFormatAvailable(CF_UNICODETEXT) == 0 {
+                return None;
+            }
+            if OpenClipboard(0) == 0 {
+                return None;
+            }
+            let out = (|| {
+                let h = GetClipboardData(CF_UNICODETEXT);
+                if h == 0 {
+                    return None;
+                }
+                let p = GlobalLock(h) as *const u16;
+                if p.is_null() {
+                    return None;
+                }
+                // 以 NUL 结尾求长度。
+                let mut len = 0usize;
+                while *p.add(len) != 0 {
+                    len += 1;
+                }
+                let slice = std::slice::from_raw_parts(p, len);
+                let s = String::from_utf16_lossy(slice);
+                GlobalUnlock(h);
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s)
+                }
+            })();
+            CloseClipboard();
+            out
+        }
+    }
+
+    fn clipboard_set(&self, text: &str) {
+        const CF_UNICODETEXT: u32 = 13;
+        const GMEM_MOVEABLE: u32 = 0x0002;
+        unsafe {
+            let mut w: Vec<u16> = text.encode_utf16().collect();
+            w.push(0);
+            let bytes = w.len() * 2;
+            let h = GlobalAlloc(GMEM_MOVEABLE, bytes);
+            if h == 0 {
+                return;
+            }
+            let p = GlobalLock(h) as *mut u16;
+            if p.is_null() {
+                GlobalFree(h);
+                return;
+            }
+            std::ptr::copy_nonoverlapping(w.as_ptr(), p, w.len());
+            GlobalUnlock(h);
+            if OpenClipboard(0) == 0 {
+                GlobalFree(h);
+                return;
+            }
+            EmptyClipboard();
+            // 成功后系统接管内存；失败才需要我们释放。
+            if SetClipboardData(CF_UNICODETEXT, h) == 0 {
+                GlobalFree(h);
+            }
+            CloseClipboard();
         }
     }
 }

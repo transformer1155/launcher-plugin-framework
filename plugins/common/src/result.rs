@@ -82,6 +82,8 @@ pub mod biz_codes {
     pub const LIMIT_EXCEEDED: &str = "limit_exceeded";
     /// 功能未实现（明确未实现的占位，不能假装成功）。
     pub const UNSUPPORTED: &str = "unsupported";
+    /// 启动失败（spawn 进程失败 / Java 不可用）。
+    pub const LAUNCH_FAILED: &str = "launch_failed";
 }
 
 /// 提前返回一个业务失败。

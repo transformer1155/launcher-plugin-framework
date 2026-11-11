@@ -5,8 +5,10 @@ pub mod accounts;
 pub mod downloads;
 pub mod home;
 pub mod logs;
+pub mod plugins;
 pub mod settings;
 pub mod versions;
+pub mod workshop;
 
 use crate::domain::LauncherModel;
 use crate::shell::Page;
@@ -27,6 +29,13 @@ pub fn render_page(
         Page::Downloads => downloads::render(ui, m, r, theme),
         Page::Settings => settings::render(ui, m, r, theme),
         Page::Logs => logs::render(ui, m, r, theme),
+        Page::Plugins => plugins::render(ui, m, r, theme),
+        Page::Workshop => workshop::render(ui, m, r, theme),
+        // 页面插件：越界（热重载删掉了当前页）就回首页。
+        Page::Custom(i) => match m.page_plugins.get(i).cloned() {
+            Some(decl) => crate::page_plugin::render(ui, m, &decl, r, theme),
+            None => Some(Page::Home),
+        },
         _ => None,
     }
 }

@@ -86,6 +86,15 @@ impl App {
         };
     }
 
+    /// 冻结页面进入动画（离屏截图用）。
+    ///
+    /// `--shot` 路径用 `dt = 0` 渲染一帧，而 `set_page` 会把 `page_anim_ms`
+    /// 归零（动画开启时）。于是内容区被裁成「宽度 0」的矩形，整页被裁掉。
+    /// 截图需要的是静态成品，因此在渲染前把入场动画直接置为完成态。
+    pub fn freeze_page_animation(&mut self) {
+        self.page_anim_ms = PAGE_ANIM_MS;
+    }
+
     /// 命令行外观参数入口。
     pub fn set_style(&mut self, style: StyleConfig) {
         self.theme.style = style.clone();
@@ -185,6 +194,12 @@ impl App {
             self.model.log("[INFO] 从系统托盘恢复窗口");
         }
 
+        // 系统级最小化（任务栏右键"最小化"）被后端拦截为"隐藏到托盘"。
+        if ui.tray_minimized_requested() && !self.model.tray_hidden {
+            self.model.tray_hidden = true;
+            self.model.log("[INFO] 已最小化到系统托盘");
+        }
+
         let keys = ui.shortcuts();
         for k in &keys {
             match *k {
@@ -205,6 +220,11 @@ impl App {
             }
         }
         if let Some(p) = shell::shortcut_page(&keys) {
+            self.set_page(p);
+        }
+
+        // 页面跳转请求（如安装版本时跳到下载中心看进度）。
+        if let Some(p) = self.model.pending_nav.take() {
             self.set_page(p);
         }
 

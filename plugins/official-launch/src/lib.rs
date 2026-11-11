@@ -19,6 +19,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod java;
 pub mod store;
 pub mod tools;
 
@@ -37,12 +38,26 @@ pub fn tools() -> ToolSet {
             tools::set_launch_config::def(),
             tools::launch_game::def(),
             tools::get_last_log::def(),
+            tools::detect_java::def(),
+            tools::download_java::def(),
+            tools::install_minecraft::def(),
+            tools::list_versions::def(),
         ],
     )
 }
 
 pub fn build(data_dir: impl Into<std::path::PathBuf>) -> (PluginContext, ToolSet) {
     build_with_logger(data_dir, Arc::new(StderrLogger))
+}
+
+/// 带 HTTP 端口构建（`download_java` 需要宿主注入网络能力）。
+pub fn build_with_http(
+    data_dir: impl Into<std::path::PathBuf>,
+    logger: Arc<dyn PluginLogger>,
+    http: Arc<dyn launcher_plugin_common::HttpPort>,
+) -> (PluginContext, ToolSet) {
+    let ctx = PluginContext::new(PLUGIN_ID, data_dir, logger).with_http(http);
+    (ctx, tools())
 }
 
 pub fn build_with_logger(

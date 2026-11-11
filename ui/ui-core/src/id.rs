@@ -95,6 +95,9 @@ pub enum Event {
     FilesDropped { paths: Vec<String> },
     /// 托盘图标被点击，请求恢复窗口。
     TrayRestore,
+
+    /// 后端拦截了"最小化到托盘"（例如托盘图标不可用时），转发给 UI 决定兜底行为。
+    TrayMinimized,
 }
 
 /// 业务层可直接消费的全局快捷键。

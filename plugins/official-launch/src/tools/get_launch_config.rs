@@ -40,6 +40,15 @@ pub async fn handle(
         "memory_mb": config.memory_mb,
         // 让 UI 能显示"当前是默认值，尚未自定义"
         "is_default": is_default,
+        // 启动入口类型：none=未装配（探测式），main_class=真实 Minecraft 入口已就绪。
+        // UI 在点启动前用它判断"Minecraft 是否真的已下载装配完成"。
+        "entry_kind": match config.entry {
+            crate::store::LaunchEntry::None => "none",
+            crate::store::LaunchEntry::Jar(_) => "jar",
+            crate::store::LaunchEntry::MainClass { .. } => "main_class",
+            crate::store::LaunchEntry::Raw(_) => "raw",
+        },
+        "java_path": config.java_path,
     })))
 }
 

@@ -66,7 +66,7 @@ pub struct Snapshot {
     pub toast: Option<Toast>,
     /// 数据来源说明（"示例数据" / "实时"）。
     pub source: DataSource,
-    /// 启动日志（模拟启动会往这里追加真实可见的变化）。
+    /// 游戏运行日志（环形缓冲，最新在后）。
     pub log_lines: Vec<String>,
 }
 

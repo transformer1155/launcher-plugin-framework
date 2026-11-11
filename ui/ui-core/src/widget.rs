@@ -311,7 +311,17 @@ impl<B: Backend + ?Sized> Ui<'_, B> {
         text: &mut String,
         placeholder: &str,
     ) -> Response {
-        let id = self.next_id(label);
+        // ★ ID 只由「父容器 + 标签」派生，不用顺序下标。
+        //
+        // 旧实现走 `next_id`（父 + 自增序号 + 标签）：页面里任何条件控件
+        // （toast、扫描结果行、下载任务行）出现/消失都会让后续控件的序号
+        // 整体平移 → 输入框 ID 每帧变化 → 焦点/按下态错乱，表现为
+        // "点一下输入框，打字没反应"。
+        // 固定用 `u32::MAX` 槽位 + 前缀，避免与顺序控件撞车；
+        // 同一父容器下两个相同 label 的输入框视为同一控件（页面上不这么用）。
+        let parent = self.current_parent();
+        let id = crate::id::WidgetId::derive(parent, u32::MAX, &format!("text_input:{label}"));
+
         let theme = self.theme.clone();
         let (hovered, clicked, _pressed) = self.detect_click_pub(id, rect);
 
@@ -319,7 +329,36 @@ impl<B: Backend + ?Sized> Ui<'_, B> {
         if clicked {
             self.request_focus(id);
         }
-        let focused_now = self.has_focus(id);
+        let mut focused_now = self.has_focus(id);
+
+        // 已聚焦时点击了输入框以外的地方 → 失焦（标准文本框行为）。
+        // 注意即使 MouseDown 已被别的控件消费也要失焦，所以直接扫原始事件。
+        if focused_now && self.left_mouse_down_outside(rect) {
+            self.clear_focus();
+            focused_now = false;
+        }
+
+        // 已聚焦时处理剪贴板快捷键：Ctrl+C 复制全部、Ctrl+X 剪切、Ctrl+V 粘贴。
+        // （本输入框没有选区模型，C/X 都是整段文本；V 追加到末尾。）
+        // 先把快捷键收集成值再操作，避免事件迭代与剪贴板调用互相借用的冲突。
+        let mut paste: Option<String> = None;
+        if focused_now {
+            for c in self.shortcut_ctrl_keys() {
+                match c {
+                    'C' | 'X' => {
+                        self.clipboard_set(text);
+                        if c == 'X' {
+                            text.clear();
+                        }
+                    }
+                    'V' => paste = self.clipboard_get(),
+                    _ => {}
+                }
+            }
+        }
+        if let Some(s) = paste {
+            text.push_str(&s);
+        }
 
         // 背景 + 边框（圆角）
         let radius = theme.style.radius();
@@ -731,7 +770,9 @@ impl<B: Backend + ?Sized> Ui<'_, B> {
 
     // ---- 供控件模块内部使用的桥接（避免把私有方法暴露给业务代码） ----
 
-    pub(crate) fn detect_click_pub(&mut self, id: WidgetId, rect: Rect) -> (bool, bool, bool) {
+    /// 供控件与**业务页面**检测一次矩形区域内的完整点击（按下 + 释放都在同一矩形）。
+    /// 返回 `(hovered, clicked, pressed)`。
+    pub fn detect_click_pub(&mut self, id: WidgetId, rect: Rect) -> (bool, bool, bool) {
         self.detect_click(id, rect)
     }
 

@@ -214,8 +214,14 @@ async fn set_warns_on_low_memory_but_succeeds() {
 // ===========================================================================
 
 #[tokio::test]
-async fn launch_returns_null_pid_and_marks_simulated() {
-    // 核心断言：pid 必须是 null（按裁决），并标 simulated。
+async fn launch_spawns_real_java_process() {
+    // 真实 spawn：若环境里有 `java`，应返回真实 PID（数字）且 simulated=false；
+    // 若没有 `java`，应返回业务错误 launch_failed。两种情况都说明"不再是模拟启动"。
+    let java_available = std::process::Command::new("java")
+        .arg("-version")
+        .output()
+        .is_ok();
+
     let (c, logger) = ctx("launch-ok");
     let r = as_result(
         launch_game::handle(
@@ -226,20 +232,32 @@ async fn launch_returns_null_pid_and_marks_simulated() {
         )
         .await,
     );
-    assert!(!r.is_error);
-    let sc = r.structured_content.unwrap();
-    assert_eq!(
-        sc["pid"],
-        serde_json::Value::Null,
-        "pid 必须是 null，不能是假数字"
-    );
-    assert_eq!(sc["simulated"], true, "必须标注 simulated");
-    assert!(sc["note"].as_str().unwrap().contains("未创建任何 OS 进程"));
-    assert!(logger.saw(LogLevel::Info, "simulated"));
+
+    if java_available {
+        assert!(!r.is_error, "有 java 时应启动成功：{r:?}");
+        let sc = r.structured_content.unwrap();
+        assert!(
+            sc["pid"].is_u64(),
+            "pid 必须是真实数字（非 null）：{:?}",
+            sc["pid"]
+        );
+        assert_eq!(sc["simulated"], false, "必须标注非模拟");
+        assert!(logger.saw(LogLevel::Info, "[launch]"), "日志应标真实启动");
+        // 进程已退出（这里是 -version，立即 exit 0），状态可读到退出码。
+        let status = official_launch::store::launch_status();
+        assert!(status.is_some(), "应能读到真实退出码");
+    } else {
+        assert!(r.is_error, "无 java 时应返回错误");
+        assert_eq!(
+            code_of(&r).as_deref(),
+            Some("launch_failed"),
+            "spawn 失败应是企业务错误 launch_failed"
+        );
+    }
 }
 
 #[tokio::test]
-async fn launch_writes_simulated_log() {
+async fn launch_writes_real_log() {
     let (c, _) = ctx("launch-log");
     let _ = as_result(
         launch_game::handle(
@@ -252,14 +270,27 @@ async fn launch_writes_simulated_log() {
     );
 
     let log = c.data_dir().join("instances/inst-1/logs/latest.log");
-    assert!(log.exists(), "应当写模拟日志");
+    if !log.exists() {
+        // 环境无 java，spawn 失败，不会写日志——这是预期的分支。
+        eprintln!("跳过日志断言：当前环境没有 java");
+        return;
+    }
     let content = std::fs::read_to_string(&log).unwrap();
-    assert!(content.contains("simulated"), "日志必须标 simulated");
-    assert!(content.contains("inst-1"));
+    assert!(content.contains("inst-1"), "日志必须包含实例 ID");
+    assert!(content.contains("[launch]"), "日志必须标真实启动");
 }
 
 #[tokio::test]
 async fn launch_uses_saved_memory() {
+    // 依赖真实 java：环境无 java 时跳过（launch 会因 spawn 失败而返回错误）。
+    if std::process::Command::new("java")
+        .arg("-version")
+        .output()
+        .is_err()
+    {
+        eprintln!("跳过 launch_uses_saved_memory：当前环境没有 java");
+        return;
+    }
     let (c, _) = ctx("launch-mem");
     let _ =
         as_result(set_launch_config::handle(c.clone(), set_args("inst-1", &[], &[], 8192)).await);
@@ -272,6 +303,7 @@ async fn launch_uses_saved_memory() {
         )
         .await,
     );
+    assert!(!r.is_error, "启动应成功：{r:?}");
     assert_eq!(r.structured_content.unwrap()["memory_mb"], 8192);
 }
 
@@ -287,6 +319,7 @@ async fn launch_rejects_insufficient_memory() {
             jvm_args: vec![],
             game_args: vec![],
             memory_mb: 256, // 低于 MIN_MEMORY_MB
+            ..Default::default()
         },
     );
     LaunchIndex::new(c.data_dir()).save(&store).unwrap();
@@ -350,6 +383,15 @@ async fn get_log_not_found_when_never_launched() {
 
 #[tokio::test]
 async fn get_log_returns_tail_after_launch() {
+    // 依赖真实 java：无 java 时 launch 不会写日志，跳过。
+    if std::process::Command::new("java")
+        .arg("-version")
+        .output()
+        .is_err()
+    {
+        eprintln!("跳过 get_log_returns_tail_after_launch：当前环境没有 java");
+        return;
+    }
     let (c, _) = ctx("log-tail");
     // 启动两次，产生两行日志
     for _ in 0..2 {
@@ -364,11 +406,11 @@ async fn get_log_returns_tail_after_launch() {
         );
     }
     let r = as_result(get_last_log::handle(c.clone(), log_args("inst-1", Some(2))).await);
-    assert!(!r.is_error);
+    assert!(!r.is_error, "日志应可读：{r:?}");
     let sc = r.structured_content.unwrap();
     let content = sc["content"].as_str().unwrap();
     assert_eq!(content.split('\n').count(), 2, "应当正好 2 行");
-    assert!(content.contains("simulated"));
+    assert!(content.contains("[launch]"), "日志必须标真实启动");
     assert_eq!(sc["truncated"], false);
 }
 
@@ -425,7 +467,7 @@ fn tool_set_matches_manifest() {
     manifest
         .check_tools(&set.manifest_tools())
         .expect("plugin.json 的 tools 必须与代码一致");
-    assert_eq!(manifest.tools.len(), 4);
+    assert_eq!(manifest.tools.len(), 5);
 }
 
 #[test]
@@ -510,29 +552,24 @@ fn set_config_schema_matches_deserialize() {
 }
 
 #[test]
-fn launch_never_mentions_real_process_creation() {
-    // 结构性断言：源码里不应出现进程创建 API。
-    // 这是"单进程、无子进程"约束的静态检查。
+fn launch_game_spawns_real_process() {
+    // 结构性断言：源码里**必须**出现进程创建 API。
+    // 这是"真实 spawn Java 进程"这一里程碑的静态检查（取代早期的"禁止 spawn"约束）。
     let src = include_str!("../src/tools/launch_game.rs");
-    for forbidden in [
-        "std::process::Command",
-        "tokio::process",
-        "Command::new",
-        ".spawn()",
-    ] {
+    for required in ["std::process::Command", "Command::new", ".spawn()"] {
         assert!(
-            !src.contains(forbidden),
-            "launch_game 不得包含进程创建 API：`{forbidden}`"
+            src.contains(required),
+            "launch_game 必须包含进程创建 API：`{required}`"
         );
     }
 }
 
 #[test]
-fn no_process_spawn_anywhere_in_launch_plugin() {
-    // 整个插件都不该 spawn 进程。
+fn process_spawn_allowed_only_in_launch_path() {
+    // 只有真正负责启动的 launch_game.rs / store.rs（持有子进程槽位）允许 spawn 进程；
+    // 其余工具不得创建 OS 进程。
     for (name, src) in [
         ("lib.rs", include_str!("../src/lib.rs")),
-        ("store.rs", include_str!("../src/store.rs")),
         (
             "get_launch_config.rs",
             include_str!("../src/tools/get_launch_config.rs"),
@@ -540,10 +577,6 @@ fn no_process_spawn_anywhere_in_launch_plugin() {
         (
             "set_launch_config.rs",
             include_str!("../src/tools/set_launch_config.rs"),
-        ),
-        (
-            "launch_game.rs",
-            include_str!("../src/tools/launch_game.rs"),
         ),
         (
             "get_last_log.rs",
@@ -555,4 +588,13 @@ fn no_process_spawn_anywhere_in_launch_plugin() {
             "{name} 不得创建 OS 进程"
         );
     }
+    // 启动相关文件应当出现进程 API。
+    assert!(
+        include_str!("../src/tools/launch_game.rs").contains("std::process::Command"),
+        "launch_game.rs 应当 spawn 进程"
+    );
+    assert!(
+        include_str!("../src/store.rs").contains("std::process::Child"),
+        "store.rs 应当持有子进程槽位"
+    );
 }

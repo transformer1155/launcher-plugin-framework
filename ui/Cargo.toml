@@ -27,5 +27,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
 
 [profile.release]
-opt-level = 2
+opt-level = "s"        # 优化体积而非速度（启动器非计算密集型，体积优先）
 lto = "thin"
+strip = true           # 剥离符号表/调试信息（可显著减小 exe 体积）
+codegen-units = 1      # 单编译单元，配合 LTO 进一步压缩

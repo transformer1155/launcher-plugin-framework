@@ -35,6 +35,9 @@ tool_args! {
         instance_id: r_str() = "目标实例 ID",
         project_id: r_str() = "Mod 的项目 ID（来自 search_mods）",
         filename: o_str() = "可选：指定文件名；缺省时按 project_id 生成",
+        project_type: o_str() = "资源类型：mod（默认）/ resourcepack / shader",
+        game_version: o_str() = "Minecraft 版本（用于筛选兼容文件），如 1.21.1",
+        loader: o_str() = "加载器（mod 类筛选用）：fabric / forge / quilt / neoforge",
     }
 }
 
@@ -72,7 +75,7 @@ pub async fn handle(
         Err(msg) => return Err(ctx.err(ToolErrorCode::InvalidArguments, msg)),
     };
 
-    let project_id = args.project_id.trim();
+    let project_id: String = args.project_id.trim().to_owned();
     if project_id.is_empty() {
         return Err(ctx.err(ToolErrorCode::InvalidArguments, "project_id 不能为空"));
     }
@@ -82,17 +85,220 @@ pub async fn handle(
             Ok(v) => v.to_owned(),
             Err(msg) => return Err(ctx.err(ToolErrorCode::InvalidArguments, msg)),
         },
-        None => filename_for(project_id),
+        None => filename_for(&project_id),
     };
 
-    // ---- 跨插件校验：实例是否真实存在（可降级，见 verify_instance_exists）----
-    if let Some(err) = verify_instance_exists(&ctx, &instance_id).await {
-        return Ok(err);
+    // ---- 解析资源类型与目标目录 ----
+    let project_type = args
+        .project_type
+        .as_deref()
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "mod".to_owned());
+    let sub_dir = match project_type.as_str() {
+        "mod" | "mods" => "mods",
+        "resourcepack" | "resourcepacks" => "resourcepacks",
+        "shader" | "shaders" | "shaderpack" | "shaderpacks" => "shaderpacks",
+        "modpack" | "modpacks" => {
+            return Ok(business(
+                biz_codes::UNSUPPORTED,
+                "整合包（.mrpack）安装暂未支持；请先手动安装对应加载器版本",
+            ))
+        }
+        other => {
+            return Ok(business(
+                biz_codes::UNSUPPORTED,
+                format!("未知资源类型 `{other}`（支持 mod/resourcepack/shader）"),
+            ))
+        }
+    };
+
+    // ---- 真实下载：Modrinth 最新兼容版本 → 主文件 ----
+    let http = ctx.http().ok();
+    let mut real_file: Option<(Vec<u8>, String)> = None; // (bytes, 版本号)
+    if let Some(http) = &http {
+        let mut api = format!(
+            "https://api.modrinth.com/v2/project/{project_id}/version"
+        );
+        let mut filters: Vec<String> = Vec::new();
+        if let Some(v) = args.game_version.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            filters.push(format!("game_versions=[\"{v}\"]"));
+        }
+        if project_type == "mod" {
+            if let Some(l) = args.loader.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                filters.push(format!("loaders=[\"{l}\"]"));
+            }
+        }
+        if !filters.is_empty() {
+            api.push('?');
+            api.push_str(&filters.join("&"));
+        }
+        // URL 里的 [] 会被部分服务端拒绝，Modrinth 接受 URL 编码；这里直接编码。
+        let api = api.replace('[', "%5B").replace(']', "%5D").replace('"', "%22");
+        match get_version_file(http, &api).await {
+            Ok((bytes, ver, fname)) => {
+                // 用真实文件名（除非调用方显式指定）
+                let f = match &args.filename {
+                    Some(f) => f.clone(),
+                    None => fname,
+                };
+                real_file = Some((bytes, ver));
+                // 覆盖 filename
+                let filename = match validate_mod_filename(&f) {
+                    Ok(v) => v.to_owned(),
+                    Err(msg) => return Err(ctx.err(ToolErrorCode::InvalidArguments, msg)),
+                };
+                let dir = match mods_dir_target(&ctx, &instance_id, sub_dir) {
+                    Ok(d) => d,
+                    Err(msg) => return Ok(business(biz_codes::STORAGE_ERROR, msg)),
+                };
+                return install_real(
+                    &ctx, &instance_id, &project_id, &filename, &project_type,
+                    real_file, dir,
+                )
+                .await;
+            }
+            Err(e) => {
+                ctx.log_warn(format!(
+                    "Modrinth 真实下载失败（{e}），回退为占位安装"
+                ));
+            }
+        }
     }
+
+    let _ = sub_dir; // 模拟路径不用子目录
+    // ---- 模拟安装兜底（原逻辑）----
+    install_simulated(ctx, args, &instance_id, &project_id, &filename).await
+}
+
+/// 拉取 Modrinth 版本列表并下载主文件。返回 (字节, 版本号, 文件名)。
+async fn get_version_file(
+    http: &std::sync::Arc<dyn launcher_plugin_common::context::HttpPort>,
+    api: &str,
+) -> Result<(Vec<u8>, String, String), String> {
+    let reply = http
+        .get(api.to_owned())
+        .await
+        .map_err(|e| format!("请求失败：{e}"))?;
+    if reply.status != 200 {
+        return Err(format!("HTTP {}", reply.status));
+    }
+    let versions: serde_json::Value = serde_json::from_slice(&reply.body)
+        .map_err(|e| format!("JSON 解析失败：{e}"))?;
+    let first = versions
+        .as_array()
+        .and_then(|a| a.first())
+        .ok_or_else(|| "没有兼容的版本（请检查游戏版本/加载器筛选）".to_owned())?;
+    let ver = first
+        .get("version_number")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_owned();
+    let files = first
+        .get("files")
+        .and_then(|f| f.as_array())
+        .ok_or_else(|| "版本缺少 files".to_owned())?;
+    let primary = files
+        .iter()
+        .find(|f| f.get("primary").and_then(|p| p.as_bool()).unwrap_or(false))
+        .or_else(|| files.first())
+        .ok_or_else(|| "版本没有可用文件".to_owned())?;
+    let url = primary
+        .get("url")
+        .and_then(|u| u.as_str())
+        .ok_or_else(|| "文件缺少 url".to_owned())?;
+    let fname = primary
+        .get("filename")
+        .and_then(|f| f.as_str())
+        .unwrap_or("mod.jar")
+        .to_owned();
+    let dl = http.get(url.to_owned()).await.map_err(|e| format!("下载失败：{e}"))?;
+    if dl.status != 200 {
+        return Err(format!("下载 HTTP {}", dl.status));
+    }
+    if dl.body.is_empty() {
+        return Err("下载内容为空".to_owned());
+    }
+    Ok((dl.body, ver, fname))
+}
+
+/// 资源目标目录（真实安装）。
+fn mods_dir_target(
+    ctx: &launcher_plugin_common::PluginContext,
+    instance_id: &str,
+    sub_dir: &str,
+) -> Result<std::path::PathBuf, String> {
+    let dir = ctx
+        .data_dir()
+        .join("instances")
+        .join(instance_id)
+        .join(sub_dir);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("创建 {sub_dir} 目录失败：{e}"))?;
+    Ok(dir)
+}
+
+/// 真实安装：写文件 + 记录索引。
+async fn install_real(
+    ctx: &launcher_plugin_common::PluginContext,
+    instance_id: &str,
+    project_id: &str,
+    filename: &str,
+    project_type: &str,
+    real_file: Option<(Vec<u8>, String)>,
+    dir: std::path::PathBuf,
+) -> launcher_plugin_common::PluginResult {
+    use launcher_plugin_common::result::success;
+    let (bytes, ver) = real_file.expect("install_real 必须带真实文件");
+    let target = dir.join(filename);
+    if let Err(e) = std::fs::write(&target, &bytes) {
+        return Ok(business(
+            biz_codes::STORAGE_ERROR,
+            format!("写入文件失败：{e}"),
+        ));
+    }
+    // 更新 mod 索引（复用 mod store 的结构，记录类型便于列表区分）。
+    let mut store = load_mod_store!(ctx);
+    let mods = store.instances.entry(instance_id.to_owned()).or_default();
+    let entry = ModEntry {
+        filename: filename.to_owned(),
+        name: project_id.to_owned(),
+        version: format!("{ver} ({project_type})"),
+        project_id: Some(project_id.to_owned()),
+        installed_at: now_rfc3339(),
+    };
+    match mods.iter_mut().find(|m| m.filename == filename) {
+        Some(existing) => *existing = entry,
+        None => mods.push(entry),
+    }
+    save_mod_store!(ctx, &store);
+    ctx.log_info(format!(
+        "已为实例 {instance_id} 真实安装 {project_type} {project_id} -> {filename}（{} KB）",
+        bytes.len() / 1024
+    ));
+    Ok(success(json!({
+        "ok": true,
+        "simulated": false,
+        "instance_id": instance_id,
+        "filename": filename,
+        "project_id": project_id,
+        "project_type": project_type,
+        "version": ver,
+        "bytes": bytes.len(),
+    })))
+}
+
+/// 原模拟安装逻辑（网络能力缺失时的兜底）。
+async fn install_simulated(
+    ctx: launcher_plugin_common::PluginContext,
+    args: InstallModArgs,
+    instance_id: &str,
+    project_id: &str,
+    filename: &str,
+) -> launcher_plugin_common::PluginResult {
 
     // ---- 读索引 ----
     let mut store = load_mod_store!(ctx);
-    let mods = store.instances.entry(instance_id.clone()).or_default();
+    let mods = store.instances.entry(instance_id.to_owned()).or_default();
 
     // 同一实例内文件名唯一：已存在则视为"重装"，覆盖记录而不是追加。
     let already = mods.iter().any(|m| m.filename == filename);
@@ -120,7 +326,7 @@ pub async fn handle(
 
     // ---- 更新索引（重装则替换，否则追加）----
     let entry = ModEntry {
-        filename: filename.clone(),
+        filename: filename.to_owned(),
         name: project_id.to_owned(),
         version: "simulated".to_owned(),
         project_id: Some(project_id.to_owned()),

@@ -132,11 +132,22 @@ pub async fn handle(
     }
 
     // ---- 与既有配置对比：没变就不写盘（避免无意义的文件抖动）----
+    // 只覆盖用户可见的三项（jvm/game/memory）；`entry`/`java_path`/`mc_args`
+    // 由 `install_minecraft` 写入，必须保留——否则每次启动前调本工具都会把
+    // 真实的 Minecraft 启动入口重置回探测式启动。
     let mut store = load_launch_store!(ctx);
+    let existing = store.configs.get(&instance_id).cloned();
     let config = LaunchConfig {
         jvm_args: args.config.jvm_args.clone(),
         game_args: args.config.game_args.clone(),
         memory_mb: args.config.memory_mb,
+        java_path: existing.as_ref().and_then(|e| e.java_path.clone()),
+        mc_args: existing
+            .as_ref()
+            .map(|e| e.mc_args.clone())
+            .unwrap_or_default(),
+        entry: existing.as_ref().map(|e| e.entry.clone()).unwrap_or_default(),
+        natives_dir: existing.as_ref().and_then(|e| e.natives_dir.clone()),
     };
 
     if let Some(existing) = store.configs.get(&instance_id) {

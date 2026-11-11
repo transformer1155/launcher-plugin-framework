@@ -50,6 +50,12 @@ pub trait Backend {
         (size_px as f32 * 1.3).round() as i32
     }
 
+    /// 读剪贴板文本（无文本或读取失败返回 None）。
+    fn clipboard_get(&self) -> Option<String>;
+
+    /// 写剪贴板文本。
+    fn clipboard_set(&self, text: &str);
+
     /// 应用外观配置（字体 / 磨玻璃 / 窗口圆角）。
     ///
     /// # 为什么是 `&self`

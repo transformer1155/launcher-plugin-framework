@@ -226,6 +226,129 @@ fn game_tab(ui: &mut Ui<'_, impl Backend + ?Sized>, m: &mut LauncherModel, r: Re
         m.settings.height = if m.settings.width == 1920 { 1080 } else { 720 };
         m.touch();
     }
+
+    // ---- Java 运行时 ----
+    y += 8;
+    section(ui, Rect::new(r.x, y, r.w, 28), "Java 运行时", theme);
+    y += 36;
+    row(ui, r.x, y, r.w, 42, theme);
+    if ui
+        .button(
+            Rect::new(r.x + 12, y + 6, 160, 30),
+            if m.java_scanning {
+                "扫描中…"
+            } else {
+                "重新扫描 Java"
+            },
+            ButtonKind::Normal,
+            !m.java_scanning,
+        )
+        .clicked
+    {
+        m.scan_java();
+    }
+    let sel_label = m
+        .selected_java()
+        .map(|j| format!("{} {}", j.vendor, j.version))
+        .unwrap_or_else(|| "未选择".to_owned());
+    ui.text_vcenter(
+        Rect::new(r.x + 184, y + 6, r.w - 196, 30),
+        format!("已发现 {} 个，当前：{}", m.java_runtimes.len(), sel_label),
+        theme.text_dim,
+        theme.font_small,
+        TextAlign::Left,
+        false,
+    );
+    y += 50;
+
+    // 列出已发现运行时；先把展示数据拷出来，避免在迭代 m.java_runtimes 时
+    // 又调用需要 &mut self 的 select_java（借用冲突）。
+    let runtimes: Vec<(String, String, String, bool)> = m
+        .java_runtimes
+        .iter()
+        .map(|j| {
+            (
+                j.id.clone(),
+                j.vendor.clone(),
+                j.version.clone(),
+                j.bits == 32,
+            )
+        })
+        .collect();
+    let selected_id = m.selected_java.clone();
+    for (id, vendor, version, is32) in &runtimes {
+        row(ui, r.x, y, r.w, 34, theme);
+        let is_sel = selected_id.as_deref() == Some(id.as_str());
+        ui.text_vcenter(
+            Rect::new(r.x + 12, y + 3, r.w - 110, 28),
+            format!(
+                "{}  {} ({})",
+                vendor,
+                version,
+                if *is32 { "32 位" } else { "64 位" }
+            ),
+            if is_sel { theme.text } else { theme.text_dim },
+            theme.font_small,
+            TextAlign::Left,
+            false,
+        );
+        if ui
+            .button(
+                Rect::new(r.x + r.w - 96, y + 3, 84, 28),
+                if is_sel { "已选中" } else { "选择" },
+                if is_sel {
+                    ButtonKind::Primary
+                } else {
+                    ButtonKind::Normal
+                },
+                !is_sel,
+            )
+            .clicked
+        {
+            m.select_java(id);
+        }
+        y += 40;
+    }
+    if runtimes.is_empty() {
+        ui.caption(
+            Rect::new(r.x + 12, y, r.w - 24, 22),
+            "尚未发现 Java。点「重新扫描」或手动指定 java.exe 路径。",
+        );
+        y += 26;
+    }
+
+    // 手动指定 java.exe
+    y += 4;
+    row(ui, r.x, y, r.w, 42, theme);
+    label(ui, r.x + 12, y + 7, "手动指定", theme);
+    let before = m.form_java_path.clone();
+    ui.text_input(
+        Rect::new(r.x + 170, y + 6, r.w - 280, 30),
+        "java-path",
+        &mut m.form_java_path,
+        r"C:\path\to\java.exe",
+    );
+    if m.form_java_path != before {
+        m.touch();
+    }
+    if ui
+        .button(
+            Rect::new(r.x + r.w - 104, y + 6, 92, 30),
+            "添加",
+            ButtonKind::Normal,
+            true,
+        )
+        .clicked
+    {
+        let path = m.form_java_path.clone();
+        match m.add_java_manual(&path) {
+            Ok(()) => {
+                m.form_java_path.clear();
+            }
+            Err(e) => m.toast(e, ToastKind::Warn),
+        }
+        m.touch();
+    }
 }
 
 fn download_tab(

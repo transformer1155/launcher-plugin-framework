@@ -18,19 +18,25 @@ pub enum Page {
     Downloads,
     Settings,
     Logs,
+    Plugins,
     Instances,
     Mods,
     Launch,
+    /// 插件工坊：AI / 用户粘贴 JSON 创建页面插件。
+    Workshop,
+    /// 声明式页面插件（热加载自 plugins/pages/），下标对应 model.page_plugins。
+    Custom(usize),
 }
 
 impl Page {
-    pub const NAV: [Page; 6] = [
+    pub const NAV: [Page; 7] = [
         Page::Home,
         Page::Versions,
         Page::Accounts,
         Page::Downloads,
         Page::Settings,
         Page::Logs,
+        Page::Plugins,
     ];
 
     pub fn route(self) -> Page {
@@ -50,6 +56,9 @@ impl Page {
             Page::Downloads | Page::Mods => "下载中心",
             Page::Settings => "设置",
             Page::Logs => "运行日志",
+            Page::Plugins => "插件",
+            Page::Workshop => "插件工坊",
+            Page::Custom(_) => "页面插件",
         }
     }
 
@@ -61,6 +70,9 @@ impl Page {
             Page::Downloads | Page::Mods => "downloads",
             Page::Settings => "settings",
             Page::Logs => "logs",
+            Page::Plugins => "plugins",
+            Page::Workshop => "workshop",
+            Page::Custom(_) => "custom",
         }
     }
 
@@ -71,6 +83,8 @@ impl Page {
             "downloads" | "mods" => Page::Downloads,
             "settings" => Page::Settings,
             "logs" => Page::Logs,
+            "plugins" => Page::Plugins,
+            "workshop" => Page::Workshop,
             "launch" => Page::Home,
             _ => Page::Home,
         }
@@ -81,7 +95,7 @@ impl Page {
 pub fn shortcut_page(keys: &[ShortcutKey]) -> Option<Page> {
     for k in keys {
         if let ShortcutKey::Ctrl(c) = k {
-            if ('1'..='6').contains(c) {
+            if ('1'..='7').contains(c) {
                 return Some(Page::NAV[(*c as u8 - b'1') as usize]);
             }
             if *c == 'L' || *c == 'l' {
@@ -312,7 +326,7 @@ pub fn render_topbar(
 
     ui.text_vcenter(
         Rect::new(x, 0, 190, bar.h),
-        "Minecraft 启动器",
+        "Aether Launcher",
         theme.text,
         theme.font_heading,
         TextAlign::Left,
@@ -422,15 +436,11 @@ pub fn render_topbar(
     let maximize = Rect::new(base + 46, btn_y, 46, btn_h);
     let close = Rect::new(base + 92, btn_y, 46, btn_h);
     if ui.button(minimize, "—", ButtonKind::Ghost, true).clicked {
-        let action = if m.settings.minimize_to_tray {
-            m.tray_hidden = true;
-            m.log("[INFO] 已最小化到系统托盘");
-            m.touch();
-            WindowAction::MinimizeToTray
-        } else {
-            WindowAction::Minimize
-        };
-        ui.request_window_action(action);
+        // 最小化一律隐藏到系统托盘。
+        m.tray_hidden = true;
+        m.log("[INFO] 已最小化到系统托盘");
+        m.touch();
+        ui.request_window_action(WindowAction::MinimizeToTray);
     }
     if ui.button(maximize, "□", ButtonKind::Ghost, true).clicked {
         ui.request_window_action(WindowAction::ToggleMaximize);
@@ -490,6 +500,50 @@ pub fn render_sidebar(
             .clicked
         {
             goto = Some(*p);
+        }
+        y += theme.control_h + 4;
+    }
+
+    // ---- 页面插件区（热加载 + 工坊）----
+    y += theme.gap;
+    ui.line(
+        Rect::new(r.x + theme.pad, y, r.w - theme.pad * 2, 1),
+        theme.divider,
+        true,
+    );
+    y += theme.gap;
+    ui.caption(
+        Rect::new(r.x + theme.pad, y, r.w - theme.pad * 2, 22),
+        "页面插件（热加载）",
+    );
+    y += 24;
+
+    let ws_item = Rect::new(
+        r.x + theme.pad_small,
+        y,
+        r.w - theme.pad_small * 2,
+        theme.control_h,
+    );
+    if ui
+        .nav_item(ws_item, "⚒  插件工坊", page == Page::Workshop)
+        .clicked
+    {
+        goto = Some(Page::Workshop);
+    }
+    y += theme.control_h + 4;
+
+    for (i, decl) in m.page_plugins.iter().enumerate() {
+        let item = Rect::new(
+            r.x + theme.pad_small,
+            y,
+            r.w - theme.pad_small * 2,
+            theme.control_h,
+        );
+        if ui
+            .nav_item(item, &format!("{}  {}", decl.icon, decl.name), page == Page::Custom(i))
+            .clicked
+        {
+            goto = Some(Page::Custom(i));
         }
         y += theme.control_h + 4;
     }
