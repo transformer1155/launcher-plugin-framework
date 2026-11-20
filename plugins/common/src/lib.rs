@@ -14,6 +14,7 @@ pub mod json;
 pub mod manifest;
 pub mod registry;
 pub mod result;
+pub mod sandbox_alloc;
 pub mod schema;
 pub mod test_support;
 pub mod tool_macro;
@@ -25,6 +26,7 @@ pub use context::{
 pub use manifest::{ManifestError, NetworkDecl, PluginManifestV1, ReviewKind, TrustKind};
 pub use registry::{erase_handler, ToolDef, ToolSet};
 pub use result::PluginResult;
+pub use sandbox_alloc::{AllocationGuard, SandboxAllocator, SandboxContext, SandboxError};
 pub use schema::{object_schema, Field, ToolArgs};
 
 // 宏由 `#[macro_export]` 导出到 crate 根，直接用 `launcher_plugin_common::tool_def!` 即可。

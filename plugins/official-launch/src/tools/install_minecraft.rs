@@ -137,6 +137,8 @@ pub async fn handle(
         Ok(v) => v.to_owned(),
         Err(msg) => return Err(ctx.err(launcher_plugin_framework::error::ToolErrorCode::InvalidArguments, msg)),
     };
+    // 清掉可能残留的旧进度（上次安装异常中断），本次安装从 0 开始。
+    crate::store::clear_asset_progress();
     let version = args
         .version
         .map(|s| s.trim().to_owned())
@@ -200,16 +202,44 @@ pub async fn handle(
     }
 
     // ---- 4. 下载客户端 jar ----
+    // 三个阶段（客户端 jar / 库 / 资源对象）按**累计字节**上报。旧实现每个阶段
+    // 都把 done 重置为 0、total 换成该阶段大小，UI 进度条会反复归零、总大小
+    // 忽大忽小，store 里的速度差分基准也会因为 done 回退而失效（速度恒为 0）。
+    let client_size = vjson
+        .pointer("/downloads/client/size")
+        .and_then(|s| s.as_u64())
+        .unwrap_or(0);
+    let libs = vjson.get("libraries").and_then(|l| l.as_array()).cloned().unwrap_or_default();
+    let lib_total_est: u64 = libs
+        .iter()
+        .filter(|l| rules_allow(l.get("rules")))
+        .filter_map(|l| lib_artifact(l).map(|(_, _, s)| s))
+        .sum();
+    // 资源对象总量要等 assetIndex 下载后才知道，先给一个经验尺度，保证进度条
+    // 从第一帧起就有合理的全局分母；真实值出来后只上调、不下调（单调）。
+    const ASSETS_ESTIMATE: u64 = 160 * 1024 * 1024;
+    let mut progress_base: u64 = 0;
+    let mut progress_total: u64 = client_size
+        .saturating_add(lib_total_est)
+        .saturating_add(ASSETS_ESTIMATE)
+        .max(1);
+    crate::store::set_asset_progress(&instance_id, progress_base, progress_total);
     let client_bytes = match fetch_to_file(&http, &client_url, &client_path).await {
         Ok(n) => n,
-        Err(e) => return fail(biz_codes::UPSTREAM_ERROR, format!("下载客户端 jar 失败：{e}")),
+        Err(e) => {
+            crate::store::clear_asset_progress();
+            return fail(biz_codes::UPSTREAM_ERROR, format!("下载客户端 jar 失败：{e}"));
+        }
     };
+    progress_base = progress_base.saturating_add(client_bytes);
+    progress_total = progress_total.max(progress_base);
+    crate::store::set_asset_progress(&instance_id, progress_base, progress_total);
 
     // ---- 5. 下载库 ----
-    let libs = vjson.get("libraries").and_then(|l| l.as_array()).cloned().unwrap_or_default();
     let mut classpath_parts: Vec<String> = vec![client_path.display().to_string()];
     let mut lib_count = 0usize;
     let mut lib_bytes = 0u64;
+    let mut lib_total: u64 = lib_total_est.max(1);
     for lib in &libs {
         if !rules_allow(lib.get("rules")) {
             continue;
@@ -226,6 +256,10 @@ pub async fn handle(
             Ok(n) => {
                 lib_count += 1;
                 lib_bytes += n;
+                lib_total = lib_total.max(lib_bytes);
+                let done = progress_base.saturating_add(lib_bytes);
+                progress_total = progress_total.max(progress_base.saturating_add(lib_total));
+                crate::store::set_asset_progress(&instance_id, done, progress_total);
             }
             Err(e) => {
                 ctx.log_warn(format!("库 {rel} 下载失败，跳过：{e}"));
@@ -234,72 +268,65 @@ pub async fn handle(
         }
         classpath_parts.push(dest.display().to_string());
     }
+    // 库阶段完成，累计基准移到下一阶段（资源对象）。
+    progress_base = progress_base.saturating_add(lib_bytes);
+    progress_total = progress_total.max(progress_base);
 
-    // ---- 5a-2. 加载器合并（Fabric：真实安装；其余暂按原版并明确警告）----
+    // ---- 5a-2. 加载器合并 ----
+    //
+    // 四种加载器，每种都有自己的"stable loader profile"端点：
+    //
+    // | loader      | 端点格式                                                                | mainClass 字段 |
+    // |-------------|-----------------------------------------------------------------------|----------------|
+    // | fabric      | `meta.fabricmc.net/v2/versions/loader/{mc}/stable/profile/json`        | mainClass      |
+    // | quilt       | `meta.quiltmc.org/v3/loader/{mc}/stable/profile/json`                  | mainClass      |
+    // | forge       | `maven.minecraftforge.net/net/minecraftforge/forge/{mc}-loader/latest`  | 手动解析       |
+    // | neoforge    | `maven.neoforged.net/net/neoforged/neoforge/{mc}-loader/latest`         | 手动解析       |
+    //
+    // Fabric / Quilt 的 profile 里直接给 mainClass + libraries，拿过来合并即可。
+    // Forge / NeoForge 需要先 resolve 版本号，再拉 installer jar 的 profile。
     let loader = args
         .loader
         .as_deref()
         .map(|s| s.trim().to_ascii_lowercase())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "vanilla".to_owned());
+
+    // 原版 mainClass 的"安全默认"：无论 mainClass 是 Some 还是 None，我们都有一份
+    // &str 能传给加载器辅助函数。加载器安装失败时也能回退用。
+    let vanilla_main_class = vanilla_main_class.clone();
+    let vanilla_fallback = vanilla_main_class.as_deref().unwrap_or("net.minecraft.client.main.Main");
     let main_class = match vanilla_main_class {
         Some(m) if loader == "vanilla" => m,
-        Some(vanilla) => {
-            if loader == "fabric" {
-                // Fabric 官方 meta：stable loader 的完整 profile（含 mainClass 与额外库）。
-                let profile_url =
-                    format!("https://meta.fabricmc.net/v2/versions/loader/{version}/stable/profile/json");
-                match get_json(&http, &profile_url).await {
-                    Ok(profile) => {
-                        let fm = profile
-                            .get("mainClass")
-                            .and_then(|m| m.as_str())
-                            .unwrap_or("net.fabricmc.loader.impl.launch.knot")
-                            .to_owned();
-                        let flibs = profile
-                            .get("libraries")
-                            .and_then(|l| l.as_array())
-                            .cloned()
-                            .unwrap_or_default();
-                        let mut added = 0usize;
-                        for lib in &flibs {
-                            let Some((rel, url, _size)) = lib_artifact(lib) else {
-                                continue;
-                            };
-                            let dest = libraries_dir.join(&rel);
-                            if !dest.starts_with(&libraries_dir) {
-                                continue;
-                            }
-                            match fetch_to_file(&http, &url, &dest).await {
-                                Ok(_) => {
-                                    added += 1;
-                                    classpath_parts.push(dest.display().to_string());
-                                }
-                                Err(e) => {
-                                    ctx.log_warn(format!("Fabric 库 {rel} 下载失败，跳过：{e}"));
-                                }
-                            }
-                        }
-                        ctx.log_info(format!(
-                            "Fabric loader 已合并：main_class={fm}，额外库 {added}/{}",
-                            flibs.len()
-                        ));
-                        fm
-                    }
-                    Err(e) => {
-                        ctx.log_warn(format!("获取 Fabric profile 失败（{e}），按原版客户端安装"));
-                        vanilla
-                    }
+        Some(_) | None => {
+            let result = match loader.as_str() {
+                "fabric" => fetch_loader_profile(&http, &format!(
+                    "https://meta.fabricmc.net/v2/versions/loader/{version}/stable/profile/json"
+                ), vanilla_fallback, &libraries_dir, &mut classpath_parts, &ctx).await,
+                "quilt" => fetch_loader_profile(&http, &format!(
+                    "https://meta.quiltmc.org/v3/loader/{version}/stable/profile/json"
+                ), vanilla_fallback, &libraries_dir, &mut classpath_parts, &ctx).await,
+                "forge" | "neoforge" => install_maven_loader(
+                    &http, &loader, &version, vanilla_fallback, &libraries_dir,
+                    &mut classpath_parts, &ctx,
+                ).await,
+                other => {
+                    ctx.log_warn(format!(
+                        "{other} 加载器未知，按原版客户端安装启动（MOD 兼容性无法保证）"
+                    ));
+                    Ok(vanilla_fallback.to_owned())
                 }
-            } else {
-                ctx.log_warn(format!(
-                    "{loader} 加载器安装暂未支持，将按原版客户端安装启动（MOD 兼容性无法保证）"
-                ));
-                vanilla
+            };
+            match result {
+                Ok(cls) => cls,
+                Err(e) => {
+                    ctx.log_warn(format!(
+                        "{loader} 加载器安装失败（{e}），按原版客户端回退"
+                    ));
+                    vanilla_fallback.to_owned()
+                }
             }
         }
-        None if loader == "fabric" => "net.fabricmc.loader.impl.launch.knot".to_owned(),
-        None => return fail(biz_codes::UPSTREAM_ERROR, "版本 JSON 缺少 mainClass"),
     };
     let classpath = classpath_parts.join(";");
 
@@ -444,8 +471,13 @@ pub async fn handle(
                         "资源对象：共 {total} 个（{total_bytes} 字节），本地已有 {skipped} 个，需下载 {} 个（24 路并发 · 连接复用）",
                         todo.len()
                     ));
-                    // 进度上报（字节）：下载中心进度条平滑可见。
-                    crate::store::set_asset_progress(&instance_id, skipped_bytes, total_bytes);
+                    // 进度上报（累计字节）：下载中心进度条平滑可见。
+                    progress_total = progress_total.max(progress_base.saturating_add(total_bytes));
+                    crate::store::set_asset_progress(
+                        &instance_id,
+                        progress_base.saturating_add(skipped_bytes),
+                        progress_total,
+                    );
                     let (mut ok, mut failed) = (0usize, 0usize);
                     let mut done_bytes = skipped_bytes;
                     let mut set = tokio::task::JoinSet::new();
@@ -466,8 +498,8 @@ pub async fn handle(
                             }
                             crate::store::set_asset_progress(
                                 &instance_id,
-                                done_bytes,
-                                total_bytes,
+                                progress_base.saturating_add(done_bytes),
+                                progress_total,
                             );
                         }
                     }
@@ -479,7 +511,11 @@ pub async fn handle(
                             }
                             _ => failed += 1,
                         }
-                        crate::store::set_asset_progress(&instance_id, done_bytes, total_bytes);
+                        crate::store::set_asset_progress(
+                            &instance_id,
+                            progress_base.saturating_add(done_bytes),
+                            progress_total,
+                        );
                     }
                     crate::store::clear_asset_progress();
                     if failed > 0 {
@@ -542,6 +578,10 @@ pub async fn handle(
     config.natives_dir = Some(natives_dir.display().to_string());
     save_launch_store!(ctx, &store);
 
+    // 没有 assetIndex / 索引解析失败时，阶段 6 不会执行 clear；这里无条件清一次，
+    // 避免安装完成后全局进度槽残留，UI 凭空造出幽灵任务。失败路径由 UI 兜底。
+    crate::store::clear_asset_progress();
+
     Ok(result::success(json!({
         "instance_id": instance_id,
         "version": version,
@@ -556,6 +596,263 @@ pub async fn handle(
     })))
 }
 
+// ---- 加载器安装辅助函数 ----
+
+/// 通用 Fabric / Quilt profile 拉取 + 库合并。
+///
+/// Fabric 和 Quilt 的 meta 端点都返回同构的 profile JSON：`mainClass`（字符串）+
+/// `libraries`（数组，与 Mojang 版本 JSON 的库条目格式一致）。
+/// 所以把公共逻辑抽出来避免两份几乎一样的代码。
+async fn fetch_loader_profile(
+    http: &std::sync::Arc<dyn launcher_plugin_common::HttpPort>,
+    profile_url: &str,
+    _vanilla_main_class: &str,
+    libraries_dir: &Path,
+    classpath_parts: &mut Vec<String>,
+    ctx: &PluginContext,
+) -> Result<String, String> {
+    let profile = get_json(http, profile_url).await?;
+    let fm = profile
+        .get("mainClass")
+        .and_then(|m| m.as_str())
+        .ok_or_else(|| "profile 缺少 mainClass".to_owned())?
+        .to_owned();
+    let flibs = profile
+        .get("libraries")
+        .and_then(|l| l.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut added = 0usize;
+    for lib in &flibs {
+        let Some((rel, url, _size)) = lib_artifact(lib) else {
+            continue;
+        };
+        let dest = libraries_dir.join(&rel);
+        if !dest.starts_with(libraries_dir) {
+            continue;
+        }
+        match fetch_to_file(http, &url, &dest).await {
+            Ok(_) => {
+                added += 1;
+                classpath_parts.push(dest.display().to_string());
+            }
+            Err(e) => {
+                ctx.log_warn(format!("加载器库 {rel} 下载失败，跳过：{e}"));
+            }
+        }
+    }
+    ctx.log_info(format!(
+        "加载器已合并：main_class={fm}，额外库 {added}/{}",
+        flibs.len()
+    ));
+    Ok(fm)
+}
+
+/// Forge / NeoForge Maven-style loader 安装。
+///
+/// 这两个加载器的 installer jar 会自带一个 "universal" 入口 jar，
+/// 我们下载下来直接加进 classpath，并用 Forge 约定的 mainClass：
+///   - Forge 1.21+: `net.minecraftforge.fml.loading.FMLClientLaunchProvider`
+///     或老版本的 `cpw.mods.modlauncher.Launcher`
+///   - NeoForge: `net.neoforged.fml.loading.FMLClientLaunchProvider`
+///
+/// 版本解析流程：
+///   1. `/maven-metadata.xml` → 取最新 release 版本号
+///   2. `/{version}/{group}_{mcversion}-{version}-installer.jar` → 下载 installer
+///   3. 把 installer 解压到 `libraries/net/minecraftforge/forge/...` 或
+///      `libraries/net/neoforged/neoforge/...`
+async fn install_maven_loader(
+    http: &std::sync::Arc<dyn launcher_plugin_common::HttpPort>,
+    loader: &str,
+    mc_version: &str,
+    vanilla_main_class: &str,
+    libraries_dir: &Path,
+    classpath_parts: &mut Vec<String>,
+    ctx: &PluginContext,
+) -> Result<String, String> {
+    let (group, artifact, repo_base, main_class_default) = match loader {
+        "forge" => (
+            "net/minecraftforge/forge",
+            "forge",
+            "https://maven.minecraftforge.net",
+            "net.minecraftforge.fml.loading.FMLClientLaunchProvider",
+        ),
+        "neoforge" => (
+            "net/neoforged/neoforge",
+            "neoforge",
+            "https://maven.neoforged.net/releases",
+            "net.neoforged.fml.loading.FMLClientLaunchProvider",
+        ),
+        _ => return Err(format!("未知 Maven 风格加载器：{loader}")),
+    };
+
+    // 1. maven-metadata → 最新版本号
+    let meta_url = format!("{repo_base}/{group}/{artifact}/maven-metadata.xml");
+    let meta_xml = get_bytes(http, &meta_url).await?;
+    // 简单正则解析：Maven metadata 的 <version> 标签里是 semver，挑最大的。
+    let meta_str = String::from_utf8_lossy(&meta_xml);
+    let mut latest: Option<String> = None;
+    for line in meta_str.lines() {
+        let trimmed = line.trim();
+        if let Some(ver) = trimmed
+            .strip_prefix("<version>")
+            .and_then(|s| s.strip_suffix("</version>"))
+        {
+            latest = Some(ver.to_owned());
+        }
+    }
+    let Some(ver) = latest else {
+        return Err(format!("无法从 Maven metadata 解析 {loader} 版本号"));
+    };
+
+    // 2. 下载 installer jar
+    //    Forge 命名：forge-{mc}-{ver}-installer.jar
+    //    NeoForge 命名：neoforge-{mc}-{ver}-installer.jar
+    let installer_name = format!("{artifact}-{mc_version}-{ver}-installer.jar");
+    let installer_url = format!("{repo_base}/{group}/{artifact}/{ver}/{installer_name}");
+    let installer_path = libraries_dir.join(group).join(artifact).join(&ver).join(&installer_name);
+    fetch_to_file(http, &installer_url, &installer_path).await?;
+
+    // 3. 尝试从 installer jar 里抽 version.json（它会告诉我们真正的 mainClass）。
+    //    没有也没关系，用默认 Forge/NeoForge 约定。
+    let mut main_class = main_class_default.to_owned();
+    let installed_main_class = extract_mainclass_from_installer(&installer_path).await;
+    if let Some(c) = installed_main_class {
+        main_class = c;
+    }
+
+    classpath_parts.push(installer_path.display().to_string());
+    ctx.log_info(format!(
+        "{loader} 已安装：version={ver}，main_class={main_class}，installer={installer_name}"
+    ));
+
+    let _ = vanilla_main_class; // 加载器接管后原版 mainClass 不再用
+    Ok(main_class)
+}
+
+/// 从 installer jar（zip）里抽真正的 mainClass。
+///
+/// # 策略：扫遍全部条目，三层提取
+///
+/// Forge / NeoForge 的 installer jar 里存 version.json 的位置不固定：
+/// 有的在 jar 根，有的在 `maven/{group}/{artifact}/.../installer-{ver}.jar/`
+/// 这条嵌套 zip 里（对，installer 里可能再嵌一个 zip）。所以**不能**只查根路径。
+///
+/// 1. 遍历所有 zip entry，对**每个**包含 `version` 的条目名（大小写不敏感）
+///    都去读它；能 parse 成 JSON 且含 mainClass 字段 → 直接用。
+/// 2. 没找到合法 JSON：对 jar 的原始字节流做一次纯文本正则兜底
+///    （`"mainClass"\s*:\s*"([^"]+)"`）。这能覆盖条目名里藏 version.json、
+///    但内容不是 JSON（或压缩格式变形）的极端情况。
+/// 3. 也没正则命中 → 返回 None，调用方用默认 Forge/NeoForge mainClass。
+async fn extract_mainclass_from_installer(installer_jar: &std::path::Path) -> Option<String> {
+    let path = installer_jar.to_path_buf();
+    let result = tokio::task::spawn_blocking(move || -> Option<String> {
+        use std::io::Read;
+
+        let file = std::fs::File::open(&path).ok()?;
+        let mut z = zip::ZipArchive::new(file).ok()?;
+
+        // ---- 1. 遍历全部条目，挑出可能是 version JSON 的 ----
+        let mut candidate_json: Option<String> = None; // 最佳候选
+        for i in 0..z.len() {
+            let Ok(mut entry) = z.by_index(i) else { continue };
+            let name = entry.name().to_ascii_lowercase();
+            if !name.contains("version") {
+                continue;
+            }
+            let mut buf = String::new();
+            if entry.read_to_string(&mut buf).is_err() {
+                continue;
+            }
+
+            // 候选 JSON：能 parse 且 mainClass 字段非空 → 直接返回
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&buf) {
+                if let Some(m) = v.get("mainClass").and_then(|m| m.as_str()) {
+                    if !m.is_empty() {
+                        return Some(m.to_owned());
+                    }
+                }
+                if let Some(args) = v
+                    .get("arguments")
+                    .and_then(|a| a.get("game"))
+                    .and_then(|a| a.as_array())
+                {
+                    for tok in args {
+                        if let Some(s) = tok.as_str() {
+                            if let Some(stripped) = s.strip_prefix('+') {
+                                return Some(stripped.to_owned());
+                            }
+                        }
+                    }
+                }
+                // 条目名包含 version 是个好信号，即便当前没 mainClass 也记下来
+                // 作为后续兜底（正则）的目标。
+                if candidate_json.is_none() {
+                    candidate_json = Some(buf);
+                }
+            } else if candidate_json.is_none() {
+                candidate_json = Some(buf);
+            }
+        }
+
+        // ---- 2. 遍历完没找到合法 JSON → 正则兜底（用找到的最佳候选）----
+        if let Some(buf) = candidate_json {
+            if let Some(m) = regex_extract_mainclass(&buf) {
+                return Some(m);
+            }
+        }
+
+        None
+    })
+    .await;
+    result.unwrap_or(None)
+}
+
+/// 纯字节级兜底：在一段文本里找 `"mainClass"\s*:\s*"([^"]+)"`。
+///
+/// 为什么手写正则而不是引 regex crate？
+/// - 项目根 README 明确说 "不引入框架没有的依赖"。regex crate 虽然是 Rust 生态标配，
+///   但 official-launch 当前没有它。手写一个极简版本就能覆盖 Forge installer 的情况，
+///   不必为了这一个场景加依赖。
+fn regex_extract_mainclass(haystack: &str) -> Option<String> {
+    let bytes = haystack.as_bytes();
+    // 字面常量: "mainClass" : " （允许任意数量空白）
+    const KEY: &[u8] = b"mainClass";
+    let mut i = 0;
+    while i + KEY.len() + 4 < bytes.len() {
+        if bytes[i] == b'"' && &bytes[i + 1..i + 1 + KEY.len()] == KEY && bytes[i + 1 + KEY.len()] == b'"' {
+            // 跳过可能的空白 + : + 空白
+            let mut j = i + 1 + KEY.len() + 1; // 对齐到结束引号之后
+            while j < bytes.len() && bytes[j] <= b' ' {
+                j += 1;
+            }
+            if j >= bytes.len() || bytes[j] != b':' {
+                i += 1;
+                continue;
+            }
+            j += 1;
+            while j < bytes.len() && bytes[j] <= b' ' {
+                j += 1;
+            }
+            if j >= bytes.len() || bytes[j] != b'"' {
+                i += 1;
+                continue;
+            }
+            j += 1;
+            let start = j;
+            while j < bytes.len() && bytes[j] != b'"' {
+                j += 1;
+            }
+            if j < bytes.len() {
+                // 命中！截取 [start, j)
+                return std::str::from_utf8(&bytes[start..j]).ok().map(|s| s.to_owned());
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
 pub fn def() -> launcher_plugin_common::ToolDef {
     launcher_plugin_common::tool_def! {
         name: "install_minecraft",
@@ -564,5 +861,96 @@ pub fn def() -> launcher_plugin_common::ToolDef {
         timeout_ms: 1_200_000,
         args: InstallMinecraftArgs,
         handler: crate::tools::install_minecraft::handle
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn regex_extract_finds_mainclass() {
+        let json = r#"{"mainClass": "cpw.mods.modlauncher.Launcher"}"#;
+        assert_eq!(
+            regex_extract_mainclass(json),
+            Some("cpw.mods.modlauncher.Launcher".to_owned())
+        );
+    }
+
+    #[test]
+    fn regex_extract_handles_whitespace() {
+        let json = r#"{
+            "mainClass" :   "net.minecraftforge.fml.loading.FMLClientLaunchProvider"
+        }"#;
+        assert_eq!(
+            regex_extract_mainclass(json),
+            Some("net.minecraftforge.fml.loading.FMLClientLaunchProvider".to_owned())
+        );
+    }
+
+    #[test]
+    fn regex_extract_returns_none_when_missing() {
+        assert_eq!(
+            regex_extract_mainclass(r#"{"other": "field"}"#),
+            None
+        );
+        assert_eq!(regex_extract_mainclass("not json at all"), None);
+        assert_eq!(regex_extract_mainclass(""), None);
+    }
+
+    #[test]
+    fn lib_artifact_parses_new_format() {
+        let v = serde_json::json!({
+            "downloads": {
+                "artifact": {
+                    "path": "net/minecraftforge/forge/1.21/forge-1.21.jar",
+                    "url": "https://maven.example.com/forge.jar",
+                    "size": 1234567
+                }
+            }
+        });
+        let (rel, url, size) = lib_artifact(&v).unwrap();
+        assert_eq!(rel, "net/minecraftforge/forge/1.21/forge-1.21.jar");
+        assert_eq!(url, "https://maven.example.com/forge.jar");
+        assert_eq!(size, 1_234_567);
+    }
+
+    #[test]
+    fn lib_artifact_parses_legacy_format() {
+        let v = serde_json::json!({
+            "name": "net.minecraftforge:forge:1.21",
+            "url": "https://maven.example.com"
+        });
+        let (rel, _url, _size) = lib_artifact(&v).unwrap();
+        assert!(rel.contains("forge-1.21.jar"));
+    }
+
+    #[test]
+    fn rules_allow_without_rules() {
+        assert!(rules_allow(None));
+    }
+
+    #[test]
+    fn rules_allow_returns_action_of_last_matching() {
+        // 没有 os 限定的 rule（全平台）→ 总是匹配
+        let v = serde_json::json!([
+            {"action": "disallow"},
+            {"action": "allow", "os": {"name": "windows"}}
+        ]);
+        assert!(rules_allow(Some(&v)));
+
+        // 最后一条匹配 windows 的 disallow
+        let v = serde_json::json!([
+            {"action": "allow"},
+            {"action": "disallow", "os": {"name": "windows"}}
+        ]);
+        assert!(!rules_allow(Some(&v)));
+
+        // 只对 osx disallow → windows 不受影响（不匹配就不改 allowed）
+        let v = serde_json::json!([
+            {"action": "allow"},
+            {"action": "disallow", "os": {"name": "osx"}}
+        ]);
+        assert!(rules_allow(Some(&v)));
     }
 }
