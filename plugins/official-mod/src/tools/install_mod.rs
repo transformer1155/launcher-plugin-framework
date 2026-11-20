@@ -113,6 +113,12 @@ pub async fn handle(
         }
     };
 
+    // ---- 跨插件校验实例是否存在 ----
+    // 只有"明确得知不存在"才拒绝；"无法校验"（未加载/对方重启中）则降级放行。
+    if let Some(result) = verify_instance_exists(&ctx, &instance_id).await {
+        return Ok(result);
+    }
+
     // ---- 真实下载：Modrinth 最新兼容版本 → 主文件 ----
     let http = ctx.http().ok();
     let mut real_file: Option<(Vec<u8>, String)> = None; // (bytes, 版本号)

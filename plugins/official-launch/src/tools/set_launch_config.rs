@@ -10,6 +10,10 @@
 //! `config` 是一个完整的对象（三个字段都在）。不做"只传部分字段就更新部分"的合并语义，
 //! 因为合并会让"我想清空 game_args"变得无法表达（空数组与"没传"无法区分）。
 //! UI 要做增量修改时应当先 `get_launch_config` 再改后整体提交。
+//!
+//! `java_path` 是**可选**字段：不传表示保留插件侧已有的 Java 路径（兼容老调用方），
+//! 传入则覆盖为 UI「Java 管理」选中的运行时；传空串表示清除并回退到 PATH 上的 `java`。
+//! 这样 UI 的选择能真正落到 `launch.json`，`launch_game` 才会用它 spawn 进程。
 
 use crate::load_launch_store;
 use crate::save_launch_store;
@@ -32,6 +36,9 @@ pub struct ConfigInput {
     #[serde(default)]
     pub game_args: Vec<String>,
     pub memory_mb: u32,
+    /// 可选：Java 可执行文件绝对路径。`None` = 不改，`Some("")` = 清除（回退 PATH）。
+    #[serde(default)]
+    pub java_path: Option<String>,
 }
 
 tool_args! {
@@ -78,6 +85,10 @@ impl launcher_plugin_common::schema::ToolArgs for SetLaunchConfigFull {
                             "minimum": 512,
                             "maximum": 32768,
                             "description": "最大堆内存（MB）"
+                        },
+                        "java_path": {
+                            "type": "string",
+                            "description": "可选：Java 可执行文件绝对路径；不传保留原值，传空串清除并回退 PATH 上的 java"
                         }
                     },
                     "required": ["memory_mb"],
@@ -132,16 +143,35 @@ pub async fn handle(
     }
 
     // ---- 与既有配置对比：没变就不写盘（避免无意义的文件抖动）----
-    // 只覆盖用户可见的三项（jvm/game/memory）；`entry`/`java_path`/`mc_args`
+    // 只覆盖用户可见的三项（jvm/game/memory）；`entry`/`mc_args`/`natives_dir`
     // 由 `install_minecraft` 写入，必须保留——否则每次启动前调本工具都会把
     // 真实的 Minecraft 启动入口重置回探测式启动。
     let mut store = load_launch_store!(ctx);
     let existing = store.configs.get(&instance_id).cloned();
+
+    // `java_path` 由 UI「Java 管理」传入：不传保留原值，传空串清除（回退 PATH），
+    // 传路径则校验文件存在后覆盖。校验放在这里而不是 launch_game，
+    // 是为了让用户点「选择」时就能得到明确错误，而不是启动时静默回退到旧 Java。
+    let java_path = match args.config.java_path.as_deref() {
+        None => existing.as_ref().and_then(|e| e.java_path.clone()),
+        Some("") => None,
+        Some(p) if p == "java" => Some(p.to_owned()),
+        Some(p) => {
+            if !std::path::Path::new(p).is_file() {
+                return Err(ctx.err(
+                    ToolErrorCode::InvalidArguments,
+                    format!("java_path 指向的文件不存在：{p}"),
+                ));
+            }
+            Some(p.to_owned())
+        }
+    };
+
     let config = LaunchConfig {
         jvm_args: args.config.jvm_args.clone(),
         game_args: args.config.game_args.clone(),
         memory_mb: args.config.memory_mb,
-        java_path: existing.as_ref().and_then(|e| e.java_path.clone()),
+        java_path,
         mc_args: existing
             .as_ref()
             .map(|e| e.mc_args.clone())
@@ -214,4 +244,41 @@ async fn handle_with_full(
     args: SetLaunchConfigFull,
 ) -> launcher_plugin_common::PluginResult {
     handle(ctx, args).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use launcher_plugin_common::schema::ToolArgs;
+
+    /// UI 传入 `java_path` 时必须能被 schema 校验 + 反序列化同时接受，
+    /// 否则「Java 管理」的选择会在启动前被 set_launch_config 直接拒绝。
+    #[test]
+    fn accepts_optional_java_path() {
+        let v = json!({
+            "instance_id": "inst-1",
+            "config": {
+                "jvm_args": ["-Xmx4G"],
+                "game_args": [],
+                "memory_mb": 4096,
+                "java_path": r"C:\Program Files\Java\jdk-21\bin\java.exe"
+            }
+        });
+        let parsed = SetLaunchConfigFull::from_value(&v).expect("带 java_path 的配置应能解析");
+        assert_eq!(
+            parsed.config.java_path.as_deref(),
+            Some(r"C:\Program Files\Java\jdk-21\bin\java.exe")
+        );
+    }
+
+    /// 不传 `java_path` 的旧调用方（既有测试 / 外部 MCP 调用）必须保持兼容。
+    #[test]
+    fn java_path_is_optional() {
+        let v = json!({
+            "instance_id": "inst-1",
+            "config": { "memory_mb": 4096 }
+        });
+        let parsed = SetLaunchConfigFull::from_value(&v).expect("不传 java_path 应兼容旧调用");
+        assert!(parsed.config.java_path.is_none());
+    }
 }

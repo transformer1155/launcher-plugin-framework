@@ -41,6 +41,9 @@ fn install_args(id: &str) -> install_mod::InstallModArgs {
         instance_id: id.to_owned(),
         project_id: "P1".to_owned(),
         filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
     }
 }
 

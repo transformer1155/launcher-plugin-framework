@@ -237,6 +237,9 @@ async fn real_search_against_real_instance_flow() {
                 instance_id: "inst-real".to_owned(),
                 project_id: "P7dR8mSH".to_owned(),
                 filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
             },
         )
         .await,
@@ -254,6 +257,9 @@ async fn real_search_against_real_instance_flow() {
                 instance_id: "inst-ghost".to_owned(),
                 project_id: "P9".to_owned(),
                 filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
             },
         )
         .await,
