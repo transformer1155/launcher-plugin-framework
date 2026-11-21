@@ -43,17 +43,26 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
         .button(search_btn, "搜索", ButtonKind::Primary, true)
         .clicked
     {
-        app.toast("搜索需要接入 host-http + official-mod.search_mods", false);
+        let q = app_search_text(app);
+        if !q.trim().is_empty() {
+            app.model_mut().search_mods_action(&q);
+        }
     }
     x += 90 + gap;
 
-    let installed_count = snap.mods.len();
     let install_btn = Rect::new(x, search_row.y, 90, search_row.h);
+    let has_instance = !snap.instances.is_empty();
     if ui
-        .button(install_btn, "安装", ButtonKind::Normal, false)
+        .button(install_btn, "安装", ButtonKind::Normal, has_instance)
         .clicked
     {
-        let _ = installed_count;
+        if has_instance {
+            let pid = app_search_text(app);
+            if !pid.trim().is_empty() {
+                let inst_id = snap.instances[0].id.clone();
+                app.model_mut().install_mod_action(&inst_id, &pid, None);
+            }
+        }
     }
 
     // ---- 已安装列表 ----
@@ -137,8 +146,9 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
     }
 
     if let Some(f) = to_remove {
-        // 真正移除需要调用 official-mod.remove_mod
-        app.toast(format!("将调用 remove_mod(filename='{f}')"), false);
+        if let Some(inst) = snap.instances.first() {
+            app.model_mut().remove_mod_action(&inst.id, &f);
+        }
     }
 }
 

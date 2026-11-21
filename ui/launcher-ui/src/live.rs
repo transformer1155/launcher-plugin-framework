@@ -401,13 +401,17 @@ impl LiveDataSource {
     pub fn install_minecraft(
         &self,
         instance_id: &str,
-        version: &str,
-        loader: &str,
+        version: Option<&str>,
+        loader: Option<&str>,
     ) -> Result<Value, String> {
-        self.call(
-            "com.example.official-launch.install_minecraft",
-            json!({ "instance_id": instance_id, "version": version, "loader": loader }),
-        )
+        let mut args = json!({ "instance_id": instance_id });
+        if let Some(v) = version {
+            args["version"] = Value::String(v.to_owned());
+        }
+        if let Some(l) = loader {
+            args["loader"] = Value::String(l.to_owned());
+        }
+        self.call("com.example.official-launch.install_minecraft", args)
     }
 
     /// 拉取 Mojang 官方可安装版本清单（供安装表单点选；后台线程调用）。

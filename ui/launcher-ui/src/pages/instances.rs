@@ -34,10 +34,8 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
         .button(new_btn, "新建实例", ButtonKind::Primary, true)
         .clicked
     {
-        app.toast(
-            "新建实例：需要接入 official-instance.create_instance",
-            false,
-        );
+        let name = format!("新实例 {}", snap.instances.len() + 1);
+        app.model_mut().create_instance_action(&name, "1.21.1", "vanilla");
     }
     x += btn_w + gap;
 
@@ -45,11 +43,13 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
     let has_selection = app.selected_instance.is_some();
     let danger_resp = ui.button(del_btn, "删除", ButtonKind::Danger, has_selection);
     if danger_resp.clicked {
-        // 二次确认：UI 侧用"必须再点一次"的简化交互。
-        app.toast(
-            "删除需要二次确认：将调用 delete_instance(confirm=true)",
-            true,
-        );
+        if let Some(ref sid) = app.selected_instance {
+            let name = snap.instances.iter()
+                .find(|i| i.id == *sid)
+                .map(|i| i.name.clone())
+                .unwrap_or_else(|| sid.clone());
+            app.model_mut().delete_instance_action(sid, &name);
+        }
     }
 
     // 统计信息（右对齐）

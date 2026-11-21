@@ -608,6 +608,8 @@ dependencies = [
  "launcher-plugin-framework",
  "serde",
  "serde_json",
+ "tokio",
+ "zip",
 ]
 
 [[package]]

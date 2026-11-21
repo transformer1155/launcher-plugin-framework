@@ -1745,7 +1745,7 @@ impl LauncherModel {
             self.spawn_plugin(move |live| {
                 let created = live.create_instance(&iname, &imc, &plugin_loader);
                 let installed = match &created {
-                    Ok(inst_id) => Some(live.install_minecraft(inst_id, &imc, &loader_id)),
+                    Ok(inst_id) => Some(live.install_minecraft(inst_id, Some(&imc), Some(&loader_id))),
                     Err(_) => None,
                 };
                 Box::new(move |d: &mut LauncherModel| match created {
@@ -2520,7 +2520,7 @@ impl LauncherModel {
             let mut ok = 0usize;
             let mut failed: Vec<String> = Vec::new();
             for (id, mc, ld) in &targets {
-                match live.install_minecraft(id, mc, ld) {
+                match live.install_minecraft(id, Some(mc.as_str()), Some(ld.as_str())) {
                     Ok(_) => ok += 1,
                     Err(e) => failed.push(format!("{mc}（{e}）")),
                 }
