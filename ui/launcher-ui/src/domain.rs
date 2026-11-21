@@ -2615,6 +2615,198 @@ impl LauncherModel {
     }
 
     // -----------------------------------------------------------------------
+    // UI 页面直达插件的公开 action 方法（全部走 spawn_plugin 后台线程）
+    // -----------------------------------------------------------------------
+
+    pub fn create_instance_action(&mut self, name: &str, mc: &str, loader: &str) {
+        if self.live.is_none() {
+            self.toast("无插件数据源（--demo 模式）", ToastKind::Info);
+            return;
+        }
+        let n = name.to_owned();
+        let m = mc.to_owned();
+        let l = loader.to_owned();
+        self.spawn_plugin(move |live| {
+            let res = live.create_instance(&n, &m, &l);
+            Box::new(move |d: &mut LauncherModel| match res {
+                Ok(inst_id) => {
+                    d.log(format!("[INFO] 实例已创建：{inst_id} ({n}, mc={m}, loader={l})"));
+                    d.toast(format!("实例「{n}」已创建"), ToastKind::Success);
+                    d.touch();
+                }
+                Err(e) => {
+                    d.log(format!("[ERROR] 创建实例失败：{e}"));
+                    d.toast(format!("创建失败：{e}"), ToastKind::Warn);
+                }
+            })
+        });
+    }
+
+    pub fn delete_instance_action(&mut self, instance_id: &str, name_for_toast: &str) {
+        if self.live.is_none() {
+            self.toast("无插件数据源（--demo 模式）", ToastKind::Info);
+            return;
+        }
+        let did = instance_id.to_owned();
+        let nname = name_for_toast.to_owned();
+        self.spawn_plugin(move |live| {
+            let res = live.delete_instance(&did);
+            Box::new(move |d: &mut LauncherModel| match res {
+                Ok(()) => {
+                    d.log(format!("[INFO] 实例已删除：{did}"));
+                    d.toast(format!("实例「{nname}」已删除"), ToastKind::Danger);
+                    d.touch();
+                }
+                Err(e) => {
+                    d.log(format!("[ERROR] 删除实例失败：{e}"));
+                    d.toast(format!("删除失败：{e}"), ToastKind::Warn);
+                }
+            })
+        });
+    }
+
+    pub fn set_launch_config_action(
+        &mut self,
+        instance_id: &str,
+        jvm_args: Vec<String>,
+        game_args: Vec<String>,
+        memory_mb: u32,
+    ) {
+        if self.live.is_none() {
+            self.toast("无插件数据源", ToastKind::Info);
+            return;
+        }
+        let inst = instance_id.to_owned();
+        let jvm = jvm_args.clone();
+        let game = game_args.clone();
+        let mem = memory_mb;
+        self.spawn_plugin(move |live| {
+            let res = live.set_launch_config(&inst, &jvm, &game, mem);
+            Box::new(move |d: &mut LauncherModel| match res {
+                Ok(()) => {
+                    d.log(format!("[INFO] 启动配置已保存：instance={inst}, mem={mem}MB"));
+                    d.toast("启动配置已保存", ToastKind::Success);
+                    d.touch();
+                }
+                Err(e) => {
+                    d.log(format!("[ERROR] 保存配置失败：{e}"));
+                    d.toast(format!("保存失败：{e}"), ToastKind::Warn);
+                }
+            })
+        });
+    }
+
+    pub fn launch_game_action(&mut self, instance_id: &str) {
+        if self.live.is_none() {
+            self.toast("无插件数据源", ToastKind::Info);
+            return;
+        }
+        let inst = instance_id.to_owned();
+        self.spawn_plugin(move |live| {
+            let res = live.launch_game(&inst);
+            Box::new(move |d: &mut LauncherModel| match res {
+                Ok(pid) => {
+                    d.log(format!("[INFO] 游戏已启动：pid={pid}"));
+                    d.toast(format!("已启动（pid={pid}）"), ToastKind::Success);
+                    d.touch();
+                }
+                Err(e) => {
+                    d.log(format!("[ERROR] 启动游戏失败：{e}"));
+                    d.toast(format!("启动失败：{e}"), ToastKind::Warn);
+                }
+            })
+        });
+    }
+
+    pub fn refresh_game_log_action(&mut self) {
+        if let Some(live) = self.live.as_ref() {
+            let new = live.drain_game_log();
+            if !new.is_empty() {
+                self.logs.extend(new);
+            }
+        }
+    }
+
+    pub fn search_mods_action(&mut self, query: &str) {
+        if self.live.is_none() {
+            self.toast("无插件数据源", ToastKind::Info);
+            return;
+        }
+        let q = query.to_owned();
+        self.spawn_plugin(move |live| {
+            let res = live.search_mods(&q);
+            Box::new(move |d: &mut LauncherModel| match res {
+                Ok(results) => {
+                    let count = results.len();
+                    let preview: Vec<String> = results.iter().take(3).map(|(_, n, _)| n.clone()).collect();
+                    d.log(format!("[INFO] 搜索 Mod「{q}」找到 {count} 条"));
+                    if count > 0 {
+                        d.toast(format!("找到 {count} 条结果：{}", preview.join("、")), ToastKind::Success);
+                    } else {
+                        d.toast("没找到匹配的 Mod", ToastKind::Warn);
+                    }
+                }
+                Err(e) => {
+                    d.log(format!("[ERROR] 搜索 Mod 失败：{e}"));
+                    d.toast(format!("搜索失败：{e}"), ToastKind::Warn);
+                }
+            })
+        });
+    }
+
+    pub fn install_mod_action(
+        &mut self,
+        instance_id: &str,
+        project_id: &str,
+        filename: Option<&str>,
+    ) {
+        if self.live.is_none() {
+            self.toast("无插件数据源", ToastKind::Info);
+            return;
+        }
+        let inst = instance_id.to_owned();
+        let pid = project_id.to_owned();
+        let fn_clone = filename.map(|s| s.to_owned());
+        self.spawn_plugin(move |live| {
+            let res = live.install_mod(&inst, &pid, fn_clone.as_deref());
+            Box::new(move |d: &mut LauncherModel| match res {
+                Ok(()) => {
+                    d.log(format!("[INFO] Mod 安装成功：instance={inst}, project={pid}"));
+                    d.toast("Mod 安装成功", ToastKind::Success);
+                    d.touch();
+                }
+                Err(e) => {
+                    d.log(format!("[ERROR] Mod 安装失败：{e}"));
+                    d.toast(format!("安装失败：{e}"), ToastKind::Warn);
+                }
+            })
+        });
+    }
+
+    pub fn remove_mod_action(&mut self, instance_id: &str, filename: &str) {
+        if self.live.is_none() {
+            self.toast("无插件数据源", ToastKind::Info);
+            return;
+        }
+        let inst = instance_id.to_owned();
+        let f = filename.to_owned();
+        self.spawn_plugin(move |live| {
+            let res = live.remove_mod(&inst, &f);
+            Box::new(move |d: &mut LauncherModel| match res {
+                Ok(()) => {
+                    d.log(format!("[INFO] Mod 已移除：{f}"));
+                    d.toast(format!("已移除 {f}"), ToastKind::Success);
+                    d.touch();
+                }
+                Err(e) => {
+                    d.log(format!("[ERROR] 移除 Mod 失败：{e}"));
+                    d.toast(format!("移除失败：{e}"), ToastKind::Warn);
+                }
+            })
+        });
+    }
+
+    // -----------------------------------------------------------------------
     // 每帧推进（动画、状态机、即时保存）
     // -----------------------------------------------------------------------
 
