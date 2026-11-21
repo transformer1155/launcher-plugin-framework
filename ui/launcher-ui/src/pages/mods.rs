@@ -51,16 +51,15 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
     x += 90 + gap;
 
     let install_btn = Rect::new(x, search_row.y, 90, search_row.h);
-    let has_instance = !snap.instances.is_empty();
+    let has_selection = app.model().current_version.is_some();
     if ui
-        .button(install_btn, "安装", ButtonKind::Normal, has_instance)
+        .button(install_btn, "安装", ButtonKind::Normal, has_selection)
         .clicked
     {
-        if has_instance {
+        if let Some(ref inst_id) = app.model().current_version {
             let pid = app_search_text(app);
             if !pid.trim().is_empty() {
-                let inst_id = snap.instances[0].id.clone();
-                app.model_mut().install_mod_action(&inst_id, &pid, None);
+                app.model_mut().install_mod_action(inst_id, &pid, None);
             }
         }
     }
@@ -146,8 +145,8 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
     }
 
     if let Some(f) = to_remove {
-        if let Some(inst) = snap.instances.first() {
-            app.model_mut().remove_mod_action(&inst.id, &f);
+        if let Some(ref inst_id) = app.model().current_version {
+            app.model_mut().remove_mod_action(inst_id, &f);
         }
     }
 }

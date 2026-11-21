@@ -40,10 +40,10 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
     x += btn_w + gap;
 
     let del_btn = Rect::new(x, actions.y, btn_w, actions.h);
-    let has_selection = app.selected_instance.is_some();
+    let has_selection = app.model().current_version.is_some();
     let danger_resp = ui.button(del_btn, "删除", ButtonKind::Danger, has_selection);
     if danger_resp.clicked {
-        if let Some(ref sid) = app.selected_instance {
+        if let Some(ref sid) = app.model().current_version {
             let name = snap.instances.iter()
                 .find(|i| i.id == *sid)
                 .map(|i| i.name.clone())
@@ -130,10 +130,10 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
         }
 
         let row = Rect::new(area.x, y, area.w, row_h);
-        let selected = app.selected_instance.as_deref() == Some(inst.id.as_str());
+        let selected = app.model().current_version.as_deref() == Some(inst.id.as_str());
         let resp = draw_row(ui, &theme, row, inst, selected);
         if resp {
-            app.selected_instance = Some(inst.id.clone());
+            app.model_mut().select_version(&inst.id);
             app.toast(format!("已选中「{}」", inst.name), false);
         }
         y += row_h + 1;
