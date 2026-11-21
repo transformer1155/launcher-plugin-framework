@@ -119,6 +119,7 @@ async fn install_then_launch_real_minecraft() {
     let args = official_launch::tools::install_minecraft::InstallMinecraftArgs {
         instance_id: "mc-e2e".to_owned(),
         version: Some("1.21.1".to_owned()),
+        loader: None,
     };
     let result = official_launch::tools::install_minecraft::handle(ctx.clone(), args)
         .await

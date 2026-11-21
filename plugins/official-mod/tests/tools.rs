@@ -61,7 +61,7 @@ impl HttpPort for FixedHttp {
         self.calls.fetch_add(1, Ordering::SeqCst);
         let status = self.status;
         let body = self.body.clone();
-        Box::pin(async move { Ok(HttpReply { status, body }) })
+        Box::pin(async move { Ok(HttpReply { status, body, location: None }) })
     }
 }
 
@@ -363,6 +363,9 @@ async fn install_writes_placeholder_and_records() {
                 instance_id: "inst-1".into(),
                 project_id: "P7dR8mSH".into(),
                 filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
             },
         )
         .await,
@@ -401,6 +404,9 @@ async fn install_twice_is_idempotent_overwrite() {
                     instance_id: "inst-1".into(),
                     project_id: "P1".into(),
                     filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
                 },
             )
             .await,
@@ -426,6 +432,9 @@ async fn install_rejects_bad_filename() {
                     instance_id: "inst-1".into(),
                     project_id: "P1".into(),
                     filename: Some(bad.into()),
+                    game_version: None,
+                    loader: None,
+                    project_type: None,
                 },
             )
             .await,
@@ -446,6 +455,9 @@ async fn install_sanitizes_project_id_into_filename() {
                 instance_id: "inst-1".into(),
                 project_id: "../evil/../x".into(),
                 filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
             },
         )
         .await,
@@ -488,6 +500,9 @@ async fn install_enforces_mod_limit() {
                 instance_id: "inst-1".into(),
                 project_id: "P-new".into(),
                 filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
             },
         )
         .await,
@@ -511,6 +526,9 @@ async fn remove_deletes_record_and_file() {
                 instance_id: "inst-1".into(),
                 project_id: "P1".into(),
                 filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
             },
         )
         .await,
@@ -552,6 +570,9 @@ async fn remove_missing_file_is_still_successful() {
                 instance_id: "inst-1".into(),
                 project_id: "P1".into(),
                 filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
             },
         )
         .await,
@@ -582,6 +603,9 @@ async fn remove_unknown_mod_is_not_found() {
                 instance_id: "inst-1".into(),
                 project_id: "P1".into(),
                 filename: None,
+                game_version: None,
+                loader: None,
+                project_type: None,
             },
         )
         .await,
@@ -631,7 +655,7 @@ fn tool_set_matches_manifest() {
     manifest
         .check_tools(&set.manifest_tools())
         .expect("plugin.json 的 tools 必须与代码注册一致");
-    assert_eq!(manifest.tools.len(), 4);
+    assert_eq!(manifest.tools.len(), 5);
 }
 
 #[test]

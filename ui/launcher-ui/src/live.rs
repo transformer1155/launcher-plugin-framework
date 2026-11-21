@@ -401,13 +401,17 @@ impl LiveDataSource {
     pub fn install_minecraft(
         &self,
         instance_id: &str,
-        version: &str,
-        loader: &str,
+        version: Option<&str>,
+        loader: Option<&str>,
     ) -> Result<Value, String> {
-        self.call(
-            "com.example.official-launch.install_minecraft",
-            json!({ "instance_id": instance_id, "version": version, "loader": loader }),
-        )
+        let mut args = json!({ "instance_id": instance_id });
+        if let Some(v) = version {
+            args["version"] = Value::String(v.to_owned());
+        }
+        if let Some(l) = loader {
+            args["loader"] = Value::String(l.to_owned());
+        }
+        self.call("com.example.official-launch.install_minecraft", args)
     }
 
     /// 拉取 Mojang 官方可安装版本清单（供安装表单点选；后台线程调用）。
@@ -458,13 +462,14 @@ impl LiveDataSource {
         &self,
         instance_id: &str,
         project_id: &str,
-        filename: &str,
+        filename: Option<&str>,
     ) -> Result<(), String> {
-        self.call(
-            "com.example.official-mod.install_mod",
-            json!({ "instance_id": instance_id, "project_id": project_id, "filename": filename }),
-        )
-        .map(|_| ())
+        let mut args = json!({ "instance_id": instance_id, "project_id": project_id });
+        if let Some(f) = filename {
+            args["filename"] = Value::String(f.to_owned());
+        }
+        self.call("com.example.official-mod.install_mod", args)
+            .map(|_| ())
     }
 
     pub fn remove_mod(&self, instance_id: &str, filename: &str) -> Result<(), String> {
@@ -473,6 +478,55 @@ impl LiveDataSource {
             json!({ "instance_id": instance_id, "filename": filename }),
         )
         .map(|_| ())
+    }
+
+    /// 在线搜索 Mod（Modrinth API），返回 (project_id, name, author) 列表。
+    pub fn search_mods(&self, query: &str) -> Result<Vec<(String, String, String)>, String> {
+        let val = self.call(
+            "com.example.official-mod.search_mods",
+            json!({ "query": query }),
+        )?;
+        let arr = val
+            .get("results")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| "search_mods 返回缺少 results 字段".to_owned())?;
+        let mut out = Vec::with_capacity(arr.len());
+        for item in arr {
+            let pid = item
+                .get("project_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned();
+            let name = item
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned();
+            let author = item
+                .get("author")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned();
+            out.push((pid, name, author));
+        }
+        Ok(out)
+    }
+
+    /// 安装 Modrinth 整合包（.mrpack 文件或 URL）。
+    pub fn install_modpack(
+        &self,
+        instance_id: &str,
+        url: Option<&str>,
+        file_path: Option<&str>,
+    ) -> Result<Value, String> {
+        let mut args = json!({ "instance_id": instance_id });
+        if let Some(u) = url {
+            args["url"] = Value::String(u.to_owned());
+        }
+        if let Some(f) = file_path {
+            args["file_path"] = Value::String(f.to_owned());
+        }
+        self.call("com.example.official-mod.install_modpack", args)
     }
 }
 

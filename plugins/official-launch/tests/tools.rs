@@ -42,6 +42,7 @@ fn set_args(id: &str, jvm: &[&str], game: &[&str], mem: u32) -> SetLaunchConfigF
             jvm_args: jvm.iter().map(|s| s.to_string()).collect(),
             game_args: game.iter().map(|s| s.to_string()).collect(),
             memory_mb: mem,
+            java_path: None,
         },
     }
 }
@@ -243,8 +244,16 @@ async fn launch_spawns_real_java_process() {
         );
         assert_eq!(sc["simulated"], false, "必须标注非模拟");
         assert!(logger.saw(LogLevel::Info, "[launch]"), "日志应标真实启动");
-        // 进程已退出（这里是 -version，立即 exit 0），状态可读到退出码。
-        let status = official_launch::store::launch_status();
+        // 进程是后台 spawn 的，等一下让 java -version 跑完
+        let status = {
+            let mut s = None;
+            for _ in 0..50 {
+                s = official_launch::store::launch_status();
+                if s.is_some() { break; }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            s
+        };
         assert!(status.is_some(), "应能读到真实退出码");
     } else {
         assert!(r.is_error, "无 java 时应返回错误");
@@ -467,7 +476,7 @@ fn tool_set_matches_manifest() {
     manifest
         .check_tools(&set.manifest_tools())
         .expect("plugin.json 的 tools 必须与代码一致");
-    assert_eq!(manifest.tools.len(), 5);
+    assert_eq!(manifest.tools.len(), 8);
 }
 
 #[test]

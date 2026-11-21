@@ -229,7 +229,13 @@ pub fn set_asset_progress(instance: &str, done: u64, total: u64) {
         // 同一实例：更新进度，并按时间窗差分采样瞬时速度。
         Some(p) if p.instance == instance => {
             let dt = now.duration_since(p.sample_at);
-            if dt.as_millis() >= SPEED_SAMPLE_MS && done >= p.sample_done {
+            if done < p.done || total != p.total {
+                // 阶段切换 / 总量调整 / 进度回退：重建差分基准。否则旧阶段的
+                // sample_done 比新 done 大，条件永远不成立，速度会一直显示 0。
+                p.speed_kb = 0;
+                p.sample_done = done;
+                p.sample_at = now;
+            } else if dt.as_millis() >= SPEED_SAMPLE_MS && done >= p.sample_done {
                 p.speed_kb = (done - p.sample_done)
                     .saturating_mul(1000)
                     / dt.as_millis().max(1) as u64
@@ -513,6 +519,28 @@ mod tests {
         let d = launcher_plugin_common::test_support::temp_path(tag);
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    #[test]
+    fn asset_progress_speed_sampling() {
+        // 全局槽位用唯一实例名隔离，测完清空，不依赖临时目录。
+        let inst = format!("speed-test-{}", std::process::id());
+        clear_asset_progress();
+        set_asset_progress(&inst, 0, 4 * 1024 * 1024);
+        std::thread::sleep(std::time::Duration::from_millis(520));
+        set_asset_progress(&inst, 512 * 1024, 4 * 1024 * 1024);
+        let (_, _, _, speed) = asset_progress().unwrap();
+        assert!(speed > 0, "累计进度应采到非零速度，实际 {speed}");
+
+        // 阶段切换导致 done 回退时必须重建差分基准（旧实现会一直显示 0 KB/s）。
+        set_asset_progress(&inst, 0, 4 * 1024 * 1024);
+        let (_, _, _, speed2) = asset_progress().unwrap();
+        assert_eq!(speed2, 0, "进度回退应重置采样");
+        std::thread::sleep(std::time::Duration::from_millis(520));
+        set_asset_progress(&inst, 256 * 1024, 4 * 1024 * 1024);
+        let (_, _, _, speed3) = asset_progress().unwrap();
+        assert!(speed3 > 0, "重建基准后应重新采到速度，实际 {speed3}");
+        clear_asset_progress();
     }
 
     #[test]

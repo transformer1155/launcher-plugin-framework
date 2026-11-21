@@ -90,7 +90,7 @@ fn full_ui_flow_install_then_launch() {
 
     // ---- 3. UI「确认安装」第二步：真实下载 Minecraft（缓存命中则秒回）----
     let info = live
-        .install_minecraft(&inst_id, "1.21.1")
+        .install_minecraft(&inst_id, Some("1.21.1"), None)
         .expect("install_minecraft 失败");
     let libs = info.get("libraries").and_then(|x| x.as_u64()).unwrap_or(0);
     eprintln!("== 安装完成：{libs} 个库");

@@ -119,12 +119,23 @@ pub fn render(app: &mut App, ui: &mut Ui<'_, impl Backend + ?Sized>, area: Rect,
         let r = Rect::new(x, btn_row.y, w, btn_row.h);
         let resp = ui.button(r, label, kind, cfg.is_some());
         if resp.clicked {
+            let Some(ref inst_id) = app.model().current_version else {
+                app.toast("请先选中一个实例", false);
+                return;
+            };
             match label {
-                "保存配置" => app.toast("将调用 set_launch_config", false),
-                "启动游戏" => {
-                    app.toast("launch_game 返回 pid=null（模拟启动，未创建进程）", false)
+                "保存配置" => {
+                    if let Some(ref c) = cfg {
+                        app.model_mut().set_launch_config_action(
+                            inst_id,
+                            c.jvm_args.clone(),
+                            c.game_args.clone(),
+                            c.memory_mb,
+                        );
+                    }
                 }
-                _ => app.toast("将调用 get_last_log", false),
+                "启动游戏" => app.model_mut().launch_game_action(inst_id),
+                _ => app.model_mut().refresh_game_log_action(),
             }
         }
         x += w + gap;

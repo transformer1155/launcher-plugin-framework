@@ -34,7 +34,7 @@ pub const PLUGIN_ID: &str = "com.example.official-mod";
 
 /// 本插件声明需要访问的域名。与 `plugin.json` 的 `network.allow_hosts` 必须一致
 /// （测试 `manifest_network_matches_code` 会断言这一点）。
-pub const REQUIRED_HOSTS: [&str; 1] = ["api.modrinth.com"];
+pub const REQUIRED_HOSTS: [&str; 2] = ["api.modrinth.com", "cdn.modrinth.com"];
 
 /// 构造全部工具。
 pub fn tools() -> ToolSet {
@@ -45,6 +45,7 @@ pub fn tools() -> ToolSet {
             tools::search_mods::def(),
             tools::install_mod::def(),
             tools::remove_mod::def(),
+            tools::install_modpack::def(),
         ],
     )
 }

@@ -61,6 +61,7 @@ impl HttpPort for MockModrinth {
                     {"project_id":"P2","title":"Sodium","description":"faster renderer"}
                 ]}"#
                 .to_vec(),
+                location: None,
             })
         })
     }
